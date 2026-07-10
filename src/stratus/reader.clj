@@ -1,10 +1,6 @@
 (ns stratus.reader
-  "Parse .stratus DSL source into Clojure data structures.
-   Since the DSL uses standard S-expression (EDN) syntax, we use
-   clojure.edn/read-string directly. The DSL IS Clojure data."
   (:require [clojure.edn :as edn]
-            [clojure.string :as str]
-            [clojure.java.io :as io])
+            [clojure.string :as str])
   (:import [java.io PushbackReader StringReader]))
 
 ;; ─── Parsing ─────────────────────────────────────────────────────────
