@@ -17,19 +17,27 @@ this entirely — your strategy DSL is valid Clojure data, so you get the full
 ## Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (357 across 17 suites)
 make test
 
 # Run individual suites
-bb -m stratus.core-test        # core generator tests (55)
-bb -m stratus.cli-test         # CLI tests (15)
-bb -m stratus.p0p1-test        # P0/P1 feature tests (20)
-bb -m stratus.p1p2-test        # P2 feature tests (18)
-bb -m stratus.remaining-test   # P3/P4/P5 feature tests (15)
-bb -m stratus.examples-test    # Example integration tests (12)
-bb -m stratus.converter-test   # Pine→Stratus converter tests (9)
-bb -m stratus.simulator-test   # Backtesting simulator tests (4)
-bb -m stratus.import-simulate-test # Import + simulate CLI tests (10)
+bb -m stratus.core-test              # core generator tests (87)
+bb -m stratus.cli-test               # CLI tests (15)
+bb -m stratus.p0p1-test              # P0/P1 feature tests (20)
+bb -m stratus.p1p2-test              # P1/P2 feature tests (18)
+bb -m stratus.remaining-test         # P3/P4/P5 feature tests (15)
+bb -m stratus.gann-swing-test        # Gann swing tests (31)
+bb -m stratus.exporter-test          # Pine exporter tests (17)
+bb -m stratus.input-test             # Input function tests (10)
+bb -m stratus.p1p2-fixes-test        # P1/P2 fix tests (22)
+bb -m stratus.p3p4-test              # P3/P4 feature tests (19)
+bb -m stratus.p1p3-final-test        # Final P1/P2/P3 tests (16)
+bb -m stratus.p2p3-remaining-test    # Remaining P2/P3 tests (13)
+bb -m stratus.last-missing-test      # Last missing features (8)
+bb -m stratus.examples-test          # Example integration tests (12)
+bb -m stratus.converter-test         # Pine→Stratus converter tests (9)
+bb -m stratus.simulator-test         # Backtesting simulator tests (4)
+bb -m stratus.import-simulate-test   # Import + simulate CLI tests (10)
 ```
 
 ## Test Examples
@@ -176,4 +184,4 @@ jobs:
       - run: make test
 ```
 
-Every push runs all 158+ tests in under 5 seconds.
+Every push runs all 357 tests in under 10 seconds.

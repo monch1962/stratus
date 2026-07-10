@@ -21,7 +21,7 @@ brew install borkdude/brew/babashka
 git clone https://github.com/monch1962/stratus
 cd stratus
 make test
-# → 336 tests, 0 failures
+# → 357 tests, 0 failures
 
 # Write a strategy
 cat > crossover.stratus << 'EOF'
@@ -69,10 +69,11 @@ Open TradingView → Pine Editor → **Ctrl+V** → **Ctrl+S** — your indicato
 
 | Document | Description |
 |---|---|
+| [`docs/TUTORIAL.md`](docs/TUTORIAL.md) | Step-by-step walkthrough: build a volatility-adaptive RSI from scratch |
+| [`docs/REFERENCE.md`](docs/REFERENCE.md) | Pine Script ↔ Stratus cross-reference: 150+ construct mappings |
 | [`docs/CLI.md`](docs/CLI.md) | Full CLI reference: compile, import, simulate, watch, new, list |
-| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | TradingView deployment guide: paste, configure, iterate |
 | [`docs/TESTING.md`](docs/TESTING.md) | Testing guide: unit tests, property tests, simulator, CI |
-| [`docs/REFERENCE.md`](docs/REFERENCE.md) | Pine Script ↔ Stratus cross-reference: 100+ construct mappings |
+| [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | TradingView deployment guide: paste, configure, iterate |
 
 ## Coverage
 
@@ -112,7 +113,7 @@ stratus/
 │   ├── constructs.clj   DSL construct definitions
 │   ├── importer.clj     Pine Script → Stratus converter
 │   └── simulator.clj    Strategy backtesting engine
-├── test/stratus/        15 test suites, 336 tests, 1343 assertions
+├── test/stratus/        17 test suites, 357 tests, 1343 assertions
 ├── examples/            11 example .stratus strategies
 ├── docs/                Split documentation
 └── .vscode/             VS Code syntax highlighting

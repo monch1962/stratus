@@ -144,7 +144,7 @@ Displays all available DSL constructs organised by category.
 
 ```bash
 ./stratus list
-# Available constructs (42 total):
+# Available constructs (150+):
 #   Indicators:
 #     sma   Simple Moving Average
 #     ema   Exponential Moving Average
