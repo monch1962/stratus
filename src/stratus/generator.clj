@@ -250,21 +250,21 @@
 ;; P0: highest / lowest
 (defmethod expr->pine :highest [form]
   (let [s (resolve-source (second form))
-        p (or (some-> (nth form 2) str) "20")]
-    (str "ta.highest(" s ", " p ")")))
+        p (some-> (nth form 2) expr->pine)]
+    (str "ta.highest(" s ", " (or p "20") ")")))
 (defmethod expr->pine :lowest [form]
   (let [s (resolve-source (second form))
-        p (or (some-> (nth form 2) str) "20")]
-    (str "ta.lowest(" s ", " p ")")))
+        p (some-> (nth form 2) expr->pine)]
+    (str "ta.lowest(" s ", " (or p "20") ")")))
 
 ;; P1: cum / highestbars / lowestbars / sum / avg / fixnan / valuewhen
 (defmethod expr->pine :cum       [form] (str "math.cum(" (expr->pine (second form)) ")"))
 (defmethod expr->pine :highestbars [form]
-  (str "ta.highestbars(" (expr->pine (second form)) ", " (or (some-> (nth form 2) str) "20") ")"))
+  (str "ta.highestbars(" (or (some-> (second form) expr->pine) "high") ", " (or (some-> (nth form 2) expr->pine) "20") ")"))
 (defmethod expr->pine :lowestbars [form]
-  (str "ta.lowestbars(" (expr->pine (second form)) ", " (or (some-> (nth form 2) str) "20") ")"))
-(defmethod expr->pine :sum  [form] (str "math.sum(" (expr->pine (second form)) ", " (or (some-> (nth form 2) str) "20") ")"))
-(defmethod expr->pine :avg  [form] (str "math.avg(" (expr->pine (second form)) ", " (or (some-> (nth form 2) str) "20") ")"))
+  (str "ta.lowestbars(" (or (some-> (second form) expr->pine) "low") ", " (or (some-> (nth form 2) expr->pine) "20") ")"))
+(defmethod expr->pine :sum  [form] (str "math.sum(" (expr->pine (second form)) ", " (or (some-> (nth form 2) expr->pine) "20") ")"))
+(defmethod expr->pine :avg  [form] (str "math.avg(" (expr->pine (second form)) ", " (or (some-> (nth form 2) expr->pine) "20") ")"))
 (defmethod expr->pine :fixnan [form] (str "fixnan(" (expr->pine (second form)) ")"))
 (defmethod expr->pine :valuewhen [form]
   (str "ta.valuewhen(" (expr->pine (nth form 1)) ", " (expr->pine (nth form 2)) ")"))

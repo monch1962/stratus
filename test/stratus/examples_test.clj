@@ -145,7 +145,8 @@
    "trailing-bollinger" "multi-timeframe-macd"
    "inputs-library" "math-and-stats"
    "array-table-drawing" "control-flow"
-   "color-fills-bg" "advanced-exit"])
+   "color-fills-bg" "advanced-exit"
+   "gann-swings"])
 
 (deftest all-examples-compile
   (doseq [name all-examples]

@@ -21,6 +21,7 @@ test:
 	$(BB) -m stratus.p0p1-test
 	$(BB) -m stratus.p1p2-test
 	$(BB) -m stratus.remaining-test
+	$(BB) -m stratus.gann-swing-test
 
 compile:
 	@echo "Compiling examples..."
