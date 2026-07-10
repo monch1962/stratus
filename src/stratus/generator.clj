@@ -40,6 +40,8 @@
    :net-profit "strategy.netprofit",
    :open-profit "strategy.openprofit", :win-trades "strategy.wintrades",
    :loss-trades "strategy.losstrades", :closed-trades "strategy.closedtrades",
+   :gross-profit "strategy.grossprofit", :gross-loss "strategy.grossloss",
+   :max-drawdown "strategy.maxdrawdown", :max-runup "strategy.maxrunup",
    :allow-entry-in "strategy.risk.allow_entry_in",
    :max-intraday-orders "strategy.risk.max_intraday_filled_orders"})
 
@@ -280,6 +282,16 @@
     (str "ta.mfi(" s ", " p ")")))
 (defmethod expr->pine :obv  [form] "ta.obv")
 (defmethod expr->pine :linreg [form] (indicator-call form "ta.linreg" "close"))
+;; P2: ta.kc (Keltner Channels)
+(defmethod expr->pine :kc [form]
+  (let [{:keys [positional]} (parse-kwargs (drop 1 form))
+        f (first positional)
+        has-src (and f (or (symbol? f) (keyword? f) (list? f)))
+        src (if has-src (resolve-source f) "close")
+        args (if has-src (rest positional) positional)
+        p (or (some-> (first args) str) "20")
+        m (or (some-> (second args) str) "2.0")]
+    (str "ta.kc(" src ", " p ", " m ")")))
 (defmethod expr->pine :alma [form]
   (let [p (or (some-> (second form) str) "10")
         o (or (some-> (nth form 2) str) "6")
@@ -453,12 +465,14 @@
         name-str (str/join ", " (map name names))]
     (str "[" name-str "] = " (expr->pine expr))))
 
-;; ─── P0: request.security() ─────────────────────────────────────────
+;; ─── P0: request.security() / security_lower_tf ──────────────────────
 
 (defmethod expr->pine :security [form]
   (let [tf (second form)
         expr (nth form 2)]
     (str "request.security(syminfo.tickerid, \"" tf "\", " (expr->pine expr) ")")))
+(defmethod expr->pine :security-lower-tf [form]
+  (str "request.security_lower_tf(syminfo.tickerid, " (expr->pine (nth form 1)) ", " (expr->pine (nth form 2)) ")"))
 
 ;; ─── P0: if/else multi-branch ──────────────────────────────────────
 
@@ -500,6 +514,11 @@
 (defmethod expr->pine :pi  [form] "math.pi")
 (defmethod expr->pine :tau [form] "math.tau")
 (defmethod expr->pine :e   [form] "math.e")
+;; round with optional precision
+(defmethod expr->pine :round [form]
+  (if (> (count form) 2)
+    (str "math.round(" (expr->pine (nth form 1)) ", " (expr->pine (nth form 2)) ")")
+    (str "math.round(" (expr->pine (second form)) ")")))
 (defmethod expr->pine :pow [form]
   (str "math.pow(" (expr->pine (nth form 1)) ", " (expr->pine (nth form 2)) ")"))
 (defmethod expr->pine :min [form]
@@ -727,7 +746,8 @@
 ;; P4: ticker functions
 (doseq [[sym pine] [['ticker.heikinashi "ticker.heikinashi"] ['ticker.renko "ticker.renko"]
                     ['ticker.linebreak "ticker.linebreak"] ['ticker.kagi "ticker.kagi"]
-                    ['ticker.pnf "ticker.pnf"] ['ticker.range "ticker.range"]]]
+                    ['ticker.pnf "ticker.pnf"] ['ticker.range "ticker.range"]
+                    ['ticker.new "ticker.new"]]]
   (defmethod expr->pine sym [form]
     (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
 
@@ -847,3 +867,34 @@
          (str/join "\n" (map expr->pine (by-type :line.new)))
          (str/join "\n" (map expr->pine (by-type :label.new)))
          (str/join "\n" (map expr->pine (by-type :box.new)))]))))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Additional generators (appended after main file for compat)
+;; ═══════════════════════════════════════════════════════════════════
+
+;; Type predicates (only non-conflicting names)
+(doseq [[sym pine] [['series "series"] ['array "array"]
+                    ['string "string"] ['int "int"] ['float "float"] ['bool "bool"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; ta.cmo / ta.wad
+(defmethod expr->pine :cmo [form] (indicator-call form "ta.cmo" "close"))
+(defmethod expr->pine :wad [form]
+  (if (> (count form) 1)
+    (str "ta.wad(" (str/join ", " (map expr->pine (rest form))) ")")
+    "ta.wad"))
+
+;; ta.crossover / ta.crossunder (raw)
+(defmethod expr->pine :crossover [form]
+  (str "ta.crossover(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :crossunder [form]
+  (str "ta.crossunder(" (str/join ", " (map expr->pine (rest form))) ")"))
+
+;; Additional label/line/box property setters
+(doseq [[sym pine] [['label.set-style "label.set_style"] ['label.set-textcolor "label.set_textcolor"]
+                    ['label.set-textalign "label.set_textalign"] ['label.set-size "label.set_size"]
+                    ['line.set-xloc "line.set_xloc"]
+                    ['box.set-extend "box.set_extend"] ['box.set-style "box.set_style"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
