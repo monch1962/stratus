@@ -1,0 +1,29 @@
+;; Stratus — Advanced Exit Strategies
+;; Demonstrates: strategy.exit with stop-loss, take-profit, trailing stops
+;;              strategy.order, strategy.cancel, fill between levels
+
+(strategy "Advanced Exits"
+  :default-qty 100)
+
+(def src close)
+(def atr-val (atr 14))
+(def entry-level (highest src 20))
+
+(on-bar
+  (when (crosses-above src entry-level)
+    (long "ENTER")))
+
+;; Multiple exits with different parameters
+(exit "TWENTY_PCT" :from "ENTER" :profit 20)
+(exit "ATR_STOP" :from "ENTER" :loss (* 1.5 atr-val))
+(exit "TRAILER" :from "ENTER" :trail (* 3 atr-val) :trail-offset (* 0.5 atr-val))
+
+;; Cancel and replace orders
+(order "LIMIT_BUY" :long 100.0 :limit (- close (* 0.5 atr-val)))
+(order "LIMIT_SELL" :short 100.0 :limit (+ close (* 0.5 atr-val)))
+
+;; Plot entry and exit levels
+(hline entry-level "Entry Zone" :color green :linestyle dashed)
+(plot src "Price" :color blue :linewidth 2)
+(alertcondition (crosses-above src entry-level) "Entry signal")
+(alertcondition (crosses-below src (ema src 20)) "Exit signal")

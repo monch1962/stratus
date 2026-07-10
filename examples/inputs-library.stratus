@@ -1,0 +1,28 @@
+;; Stratus — Library with Input Parameters and User Functions
+;; Demonstrates: library, input-*, defn, export, tostring, color.rgb
+
+(library "TA Utilities"
+  :overlay false)
+
+(input-int "Period" :def 14 :min 2 :max 100)
+(input-source "Source" :def close)
+(input-bool "Show Signal" :def true)
+(input-color "Signal Color" :def blue)
+(input-string "Label Prefix" :def "SIG")
+
+(defn divergence [src1 src2 period]
+  (- src1 (sma src1 period)))
+
+(defn signal-strength [val]
+  (abs (log (abs val))))
+(export signal-strength)
+
+(defn format-signal [val]
+  (tostring (round val 2)))
+(export format-signal)
+
+(def my-rsi (rsi 14))
+(def div (divergence close (sma close 50) 20))
+
+(plot my-rsi "RSI" :color (rgb 65 105 225))
+(plot div "Divergence" :color (if (show-signal) (signal-color) (rgb 128 128 128)))

@@ -1,0 +1,37 @@
+;; Stratus — Math and Statistics Indicator
+;; Demonstrates: sum, avg, stdev, cum, correlation, median, percentile
+;;              change, mom, highest, lowest, highestbars, lowestbars
+
+(indicator "Math & Stats Lab"
+  :overlay false
+  :precision 4)
+
+(def src close)
+(def rolling-sum (sum src 20))
+(def rolling-avg (avg src 20))
+(def rolling-stdev (stdev src 20))
+(def rolling-corr (correlation src high 20))
+(def rolling-median (median src 20))
+(def rolling-pct (percentile src 20 75))
+(def rolling-cum (cum (change src 1)))
+(def rolling-mom (mom src 14))
+(def hh (highest high 50))
+(def ll (lowest low 50))
+(def hb (highestbars high 50))
+(def lb (lowestbars low 50))
+(def spread (- hh ll))
+(def z-score (/ (- src rolling-avg) rolling-stdev))
+(def floor-avg (floor rolling-avg))
+(def ceil-avg (ceil rolling-avg))
+(def sqrt-stdev (sqrt rolling-stdev))
+(def abs-z (abs z-score))
+
+(plot src "Price" :color gray)
+(plot rolling-avg "SMA 20" :color blue)
+(plot rolling-median "Median" :color orange)
+(plot rolling-pct "75th Pct" :color purple)
+(plot rolling-cum "Cum Sum" :color green)
+(plot z-score "Z-Score" :color red)
+(hline 0 :color gray :linestyle dotted)
+(alertcondition (z-score z-score 2) "Extreme move")
+(alertcondition (> (abs z-score) 2) "2-sigma event")

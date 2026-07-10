@@ -1,0 +1,26 @@
+;; Stratus — Arrays, Tables, and Drawing Objects
+;; Demonstrates: array-*, table.new, table.cell, line.new, label.new, box.new
+
+(indicator "Array & Drawing Lab"
+  :overlay true)
+
+(defvar buffer (array-float 50))
+(defvar idx 0)
+(def current (sma 20))
+
+(on-bar
+  (set! buffer (push buffer current))
+  (when (> (size buffer) 50)
+    (set! buffer (pop buffer)))
+  (set! idx (get buffer (size buffer 1))))
+
+(table.new :position top-right :cols 4 :rows 2 :bgcolor white :border-color black)
+(table-cell tbl 0 0 "SMA")
+(table-cell tbl 0 1 (tostring current))
+(table-cell tbl 1 0 "Count")
+(table-cell tbl 1 1 (tostring (size buffer)))
+
+(def my-line (line.new 0 0 10 10 :color blue :width 2))
+(def my-label (label.new 0 0 "Label" :color yellow :textcolor black))
+
+(plot current "SMA" :color blue :linewidth 2)

@@ -1,0 +1,30 @@
+;; Stratus — Control Flow Examples
+;; Demonstrates: if/else/elseif, for, while, switch, do, when
+
+(strategy "Control Flow Demo"
+  :default-qty 100
+  :pyramiding 1)
+
+(def fast-sma (sma 20))
+(def slow-sma (sma 50))
+(def rsi-val (rsi 14))
+(defvar sum 0)
+(defvar counter 0)
+
+(on-bar
+  ;; if/elseif/else multi-branch
+  (if (> rsi-val 70)
+    (short "OVERBOUGHT")
+    (< rsi-val 30)
+    (long "OVERSOLD")
+    :else
+    (if (crosses-above fast-sma slow-sma)
+      (long "TREND")
+      :else (short "REV")))
+
+  ;; for loop with persistent state
+  (for [i (range 1 5)] (set! sum (+ sum (close i))))
+  (set! counter (sqrt sum)))
+
+(plot fast-sma "Fast" :color blue)
+(plot slow-sma "Slow" :color red)

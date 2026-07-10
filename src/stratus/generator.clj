@@ -501,7 +501,7 @@
 (defmethod expr->pine :array-int   [form] (str "array.new_int(" (or (some-> (second form) str) "10") ")"))
 (defmethod expr->pine :array-float [form]
   (str "array.new_float(" (or (some-> (second form) str) "10")
-       (when (nth form 2) (str ", " (val->pine (nth form 2)))) ")"))
+       (if (> (count form) 2) (str ", " (val->pine (nth form 2))) "") ")"))
 (defmethod expr->pine :push  [form] (str "array.push(" (str/join ", " (map expr->pine (rest form))) ")"))
 (defmethod expr->pine :pop   [form] (str "array.pop(" (expr->pine (second form)) ")"))
 (defmethod expr->pine :size  [form] (str "array.size(" (expr->pine (second form)) ")"))
@@ -584,6 +584,9 @@
         sets     (by-type :set!)
         multis   (by-type :multiset)
         secs     (by-type :security)
+        inputs   (concat (by-type :input-int) (by-type :input-float) (by-type :input-bool)
+                        (by-type :input-string) (by-type :input-color) (by-type :input-source)
+                        (by-type :input-symbol) (by-type :input-timeframe))
         exits    (by-type :exit)]
     (str/join "\n"
       (filter some?
@@ -591,6 +594,8 @@
          (when-let [s (first (by-type :strategy))]  (str (expr->pine s) "\n"))
          (when-let [s (first (by-type :indicator))] (str (expr->pine s) "\n"))
          (when-let [s (first (by-type :library))] (str (expr->pine s) "\n"))
+         ;; Input declarations
+         (when (seq inputs) (str (str/join "\n" (map expr->pine inputs)) "\n"))
          ;; Variable bindings: defvars, then defs, then defns, then multiset
          (when (seq defvars) (str (str/join "\n" (map expr->pine defvars)) "\n"))
          (when (seq defvips) (str (str/join "\n" (map expr->pine defvips)) "\n"))
@@ -613,4 +618,9 @@
          (str/join "\n" (map expr->pine (by-type :fill)))
          (str/join "\n" (map expr->pine (by-type :bgcolor)))
          (str/join "\n" (map expr->pine (by-type :barcolor)))
-         (str/join "\n" (map expr->pine (by-type :alertcondition)))]))))
+         (str/join "\n" (map expr->pine (by-type :alertcondition)))
+         (str/join "\n" (map expr->pine (by-type :table.new)))
+         (str/join "\n" (map expr->pine (by-type :table-cell)))
+         (str/join "\n" (map expr->pine (by-type :line.new)))
+         (str/join "\n" (map expr->pine (by-type :label.new)))
+         (str/join "\n" (map expr->pine (by-type :box.new)))]))))

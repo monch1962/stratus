@@ -1,0 +1,26 @@
+;; Stratus — Multi-Timeframe MACD Divergence
+;; Demonstrates: request.security, macd, na/nz, iff, multiset, alertcondition
+
+(strategy "MTF MACD Divergence"
+  :default-qty 100)
+
+(def monthly-macd (security "M" (macd :fast 12 :slow 26 :signal 9)))
+(def daily-macd (macd :fast 12 :slow 26 :signal 9))
+(defvar prev-monthly 0.0)
+(defvar prev-daily 0.0)
+
+(multiset [m s h] daily-macd)
+(multiset [mm ms mh] monthly-macd)
+
+(on-bar
+  (set! prev-monthly (nz (iff (na mm) prev-monthly mm)))
+  (set! prev-daily (nz (iff (na m) prev-daily m)))
+  (when (and (not (na mm)) (> mm prev-monthly) (< m prev-daily))
+    (long "DIVERGE"))
+  (when (and (not (na mm)) (< mm prev-monthly) (> m prev-daily))
+    (short "DIVERGE")))
+
+(plot m "Daily MACD" :color blue)
+(plot mm "Monthly MACD" :color orange)
+(hline 0 :color gray :linestyle dotted)
+(alertcondition (> m mm) "Bullish alignment")

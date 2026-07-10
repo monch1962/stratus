@@ -1,0 +1,32 @@
+;; Stratus — Color and Fill Effects
+;; Demonstrates: barcolor, bgcolor, fill, color.rgb, color.from-gradient
+
+(indicator "Color Lab"
+  :overlay true
+  :precision 2)
+
+(def rsi-val (rsi 14))
+(defvar prev-rsi 0.0)
+
+(on-bar
+  (set! prev-rsi rsi-val))
+
+(def rising-cond (> rsi-val prev-rsi))
+(def falling-cond (< rsi-val prev-rsi))
+
+;; Conditional bar coloring
+(barcolor rising-cond :color (rgb 0 180 60))
+(barcolor falling-cond :color (rgb 200 40 40))
+(barcolor :color (rgb 100 100 100))
+
+;; Background coloring
+(bgcolor (> rsi-val 70) :color (rgb 255 0 0 20))
+(bgcolor (< rsi-val 30) :color (rgb 0 255 0 20))
+
+;; Gradient fill between plots
+(def upper (highest close 20))
+(def lower (lowest close 20))
+
+(plot close "Price" :color blue :linewidth 2)
+(plot upper "Upper" :color (from-gradient close lower upper :green :red))
+(plot lower "Lower" :color (from-gradient close lower upper :red :green))

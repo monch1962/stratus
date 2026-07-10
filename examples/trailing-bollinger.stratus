@@ -1,0 +1,23 @@
+;; Stratus — Bollinger Bands with Trailing Stop
+;; Demonstrates: bb, var/varip, set!, strategy.exit, fill, arithmetic
+
+(strategy "Bollinger Trailing"
+  :default-qty 100
+  :pyramiding 0)
+
+(def source close)
+(defvar stop-dist 0.0)
+(def current-basis (bb 20 2.0))
+(def upper (ta.bb(close, 20, 2.0)))
+(def lower (ta.bb(close, 20, 2.0)))
+
+(on-bar
+  (if (> close upper)
+    (do (set! stop-dist (* 2 (atr 14)))
+        (long "ENTER"))
+    :else (close)))
+(exit "XL" :from "ENTER" :trail (atr 14) :trail-offset 1.5)
+
+(plot source "Price" :color gray)
+(plot (highest close 20) "Upper" :color blue :alpha 90)
+(plot (lowest close 20) "Lower" :color blue :alpha 90)
