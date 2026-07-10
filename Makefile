@@ -24,6 +24,7 @@ test:
 	$(BB) -m stratus.gann-swing-test
 	$(BB) -m stratus.exporter-test
 	$(BB) -m stratus.input-test
+	$(BB) -m stratus.p1p2-fixes-test
 
 compile:
 	@echo "Compiling examples..."
