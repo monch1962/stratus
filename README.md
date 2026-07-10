@@ -109,6 +109,175 @@ plot(slow, color=color.red, linewidth=2)
 
 ---
 
+## CLI Reference
+
+### Usage
+
+```bash
+# Via the stratus wrapper script (recommended)
+./stratus compile <file.stratus> [-o|--output <file.pine>]  Compile to Pine Script
+                          [-c|--clip]                       Copy to clipboard
+./stratus watch   <file.stratus> [-o|--output <file.pine>]  Auto-recompile on save
+                          [-c|--clip]                       Auto-copy on save
+./stratus new     <type> [name]                             Generate scaffold
+./stratus list                                               List all constructs
+
+# Or via Babashka directly
+bb -m stratus.core compile examples/golden-cross.stratus
+bb -m stratus.core list
+bb -m stratus.core new strategy "Breakout"
+```
+
+### Scaffold Generator
+
+```bash
+./stratus new strategy "My Strategy"
+# → Creates my-strategy.stratus with SMA crossover boilerplate
+
+./stratus new indicator "RSI Detector"
+# → Creates rsi-detector.stratus with RSI + inputs + hlines
+
+./stratus new library "Utils"
+# → Creates utils.stratus with function definitions and exports
+```
+
+### Compilation with Clipboard
+
+```bash
+# Compile and copy to clipboard in one step
+./stratus compile strategy.stratus --clip
+# 📋 Copied to clipboard (Ctrl+V into TradingView)
+
+# Watch mode — recompile and copy on every save
+./stratus watch strategy.stratus --clip
+# 👀 Watching strategy.stratus for changes...
+```
+
+### Friendly Error Messages
+
+```
+# Bad construct name:
+✕ Unknown construct: ema (should be sma)
+  Check spelling or run `stratus list` for available constructs.
+
+# Missing closing paren:
+✕ Unmatched parenthesis in strategy.stratus
+  Every ( must have a matching ). Check your brackets.
+
+# Wrong number of args:
+✕ Wrong number of arguments in strategy.stratus
+  A construct is missing required arguments.
+```
+
+---
+
+## VS Code Extension
+
+Stratus includes a TextMate grammar for `.stratus` files with syntax highlighting.
+
+### Install
+
+1. Open VS Code
+2. **File → Open Folder** → select the `stratus` project
+3. The `.vscode/` directory is automatically picked up
+4. Open any `.stratus` file — keywords, strings, comments, and numbers are now coloured
+
+Files are recognised by the `.stratus` extension. The grammar highlights:
+- **Blue**: DSL keywords (`strategy`, `indicator`, `def`, `on-bar`, `if`, `when`)
+- **Purple**: Technical indicators (`sma`, `ema`, `rsi`, `macd`, `bb`)
+- **Green**: Built-in variables (`close`, `high`, `time`, `position-size`)
+- **Orange**: Plotting functions (`plot`, `plotshape`, `hline`, `barcolor`)
+- **Red strings**: String literals and comment lines (`;`)
+
+---
+
+## TradingView Deployment Guide
+
+Compiling Stratus to Pine Script is the first step. Here is the complete
+workflow to get your strategy live on a TradingView chart.
+
+### Step 1: Compile
+
+```bash
+./stratus compile my-strategy.stratus --clip
+```
+
+This outputs the Pine Script code and copies it to your clipboard.
+
+### Step 2: Open TradingView Pine Editor
+
+| Action | Screenshot |
+|---|---|
+| Open TradingView and go to any chart | _(Open browser → tradingview.com → any chart)_ |
+| Click **Pine Editor** at the bottom of the screen | The editor pane opens, typically showing a default script |
+| **Select all** existing code (Ctrl+A) and **delete** it | The editor is now empty |
+
+### Step 3: Paste Compiled Code
+
+| Action | Detail |
+|---|---|
+| **Ctrl+V** (or Cmd+V) | The compiled Pine Script from Stratus appears in the editor |
+| **Ctrl+S** (or Cmd+S) | TradingView saves and compiles the script |
+
+### Step 4: Add to Chart
+
+If the script is an **indicator**:
+
+1. After saving, the indicator automatically appears on the chart
+2. Toggle settings via the gear icon next to the script name in the Data Window
+
+If the script is a **strategy**:
+
+1. After saving, click **Add to Chart** in the Pine Editor toolbar
+2. The strategy appears above the chart — click its name to open the
+   **Strategy Tester** tab below the chart
+3. Configure initial capital, order size, commission, and slippage in
+   the **Properties** tab of the Strategy Tester
+
+### Step 5: Iterate
+
+The edit-compile-paste loop:
+
+```
+1.  Edit your .stratus file in any text editor
+2.  Run:  ./stratus compile my-strategy.stratus --clip
+3.  Switch to TradingView (Alt+Tab / Cmd+Tab)
+4.  Ctrl+A → Ctrl+V → Ctrl+S
+5.  Check the chart and Strategy Tester
+6.  Go to step 1
+```
+
+With **watch mode**, steps 1-2 merge into one:
+
+```
+1.  Run once:     ./stratus watch my-strategy.stratus --clip
+2.  Edit .stratus and save   →   automatically compiles and copies
+3.  Switch to TradingView    →   Ctrl+A → Ctrl+V → Ctrl+S
+4.  Repeat from step 2
+```
+
+### Library Scripts
+
+For `library` scripts (compiled with `(library "Name" ...)`):
+
+1. Paste the compiled code into the Pine Editor
+2. Click **Save As** → give it a name matching the library name
+3. The library is now available for import in other scripts via:
+   ```pinescript
+   import <username>/<library-name>/<version>
+   ```
+
+### Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Pine Editor shows red error highlights | Unmatched brackets in `.stratus` file | Check parens match — every `(` needs a `)` |
+| "Undeclared identifier" errors | Variable name in DSL uses kebab-case with hyphens | Hyphens become underscores in Pine — make sure you reference `fast_ma` not `fast-ma` |
+| "No matching function" errors | Wrong argument count for an indicator | Check `stratus list` for correct usage |
+| Strategy not showing in tester | Missing `strategy()` header | Add `(strategy "Name" :default-qty 100)` to the top of your file |
+
+---
+
 ## Testing: The Killer Feature
 
 Pine Script has **no unit testing capability whatsoever**. There is no test runner, no assertion framework, no way to verify that your indicator produces correct signals before deploying it to a chart.
