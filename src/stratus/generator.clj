@@ -13,16 +13,23 @@
 (def time-builtins
   {:time "time", :dayofweek "dayofweek", :month "month",
    :hour "hour", :bar-index "bar_index", :ticker "syminfo.tickerid",
-   :timeframe "timeframe.period"})
+   :timeframe "timeframe.period",
+   :year "year", :dayofmonth "dayofmonth", :minute "minute",
+   :second "second", :weekofyear "weekofyear", :quarter "quarter"})
 
 (def barstate-builtins
   {:bar-confirmed "barstate.isconfirmed", :bar-first "barstate.isfirst",
-   :bar-last "barstate.islast"})
+   :bar-last "barstate.islast",
+   :bar-new "barstate.isnew", :bar-realtime "barstate.isrealtime",
+   :bar-history "barstate.ishistory"})
 
 (def syminfo-builtins
   {:mintick "syminfo.mintick", :pointvalue "syminfo.pointvalue",
    :sym-session "syminfo.session", :sym-description "syminfo.description",
-   :sym-type "syminfo.type"})
+   :sym-type "syminfo.type",
+   :currency "syminfo.currency", :base-currency "syminfo.basecurrency",
+   :price-scale "syminfo.pricescale", :min-move "syminfo.minmov",
+   :sym-sector "syminfo.sector", :sym-industry "syminfo.industry"})
 
 (def math-scalars
   [:log :log10 :exp :sqrt :abs :ceil :floor :round :pow :min :max :sign])
@@ -31,6 +38,8 @@
   {:position-size "strategy.position_size", :position-avg-price "strategy.position_avg_price",
    :open-trades "strategy.opentrades", :equity "strategy.equity",
    :net-profit "strategy.netprofit",
+   :open-profit "strategy.openprofit", :win-trades "strategy.wintrades",
+   :loss-trades "strategy.losstrades", :closed-trades "strategy.closedtrades",
    :allow-entry-in "strategy.risk.allow_entry_in",
    :max-intraday-orders "strategy.risk.max_intraday_filled_orders"})
 
@@ -70,11 +79,11 @@
   :step-line "plot.style_stepline", :step-line-diamond "plot.style_stepline_diamond"})
 
   (def table-position-map
-  {:top "table.position_top", :top-right "table.position_top_right",
-  :middle-left "table.position_middle_left", :top-left "table.position_top_left",
-  :top-center "table.position_top_center", :middle-right "table.position_middle_right",
-  :bottom-left "table.position_bottom_left", :bottom-center "table.position_bottom_center",
-  :bottom-right "table.position_bottom_right", :middle-center "table.position_middle_center"})
+    {:top-right "table.position_top_right", :top-left "table.position_top_left",
+     :top-center "table.position_top_center", :middle-right "table.position_middle_right",
+     :middle-left "table.position_middle_left", :middle-center "table.position_middle_center",
+     :bottom-left "table.position_bottom_left", :bottom-center "table.position_bottom_center",
+     :bottom-right "table.position_bottom_right"})
 
 (def lookup-tables
   (merge {:red "color.red", :green "color.green", :blue "color.blue",
@@ -401,6 +410,8 @@
 
 (defmethod expr->pine :plot           [form] (plot-call "plot" form))
 (defmethod expr->pine :plotshape      [form] (plot-call "plotshape" form))
+(defmethod expr->pine :plotchar       [form] (plot-call "plotchar" form))
+(defmethod expr->pine :plotarrow      [form] (plot-call "plotarrow" form))
 (defmethod expr->pine :hline          [form] (plot-call "hline" form))
 (defmethod expr->pine :bgcolor        [form] (plot-call "bgcolor" form))
 (defmethod expr->pine :alertcondition [form] (plot-call "alertcondition" form))
@@ -485,6 +496,10 @@
 (doseq [s [:log :log10 :exp :sqrt :abs :ceil :floor :round :sign]]
   (defmethod expr->pine s [form]
     (str "math." (name s) "(" (expr->pine (second form)) ")")))
+;; Math constants (zero-arg)
+(defmethod expr->pine :pi  [form] "math.pi")
+(defmethod expr->pine :tau [form] "math.tau")
+(defmethod expr->pine :e   [form] "math.e")
 (defmethod expr->pine :pow [form]
   (str "math.pow(" (expr->pine (nth form 1)) ", " (expr->pine (nth form 2)) ")"))
 (defmethod expr->pine :min [form]
@@ -588,6 +603,10 @@
   (str "array.set(" (expr->pine (second form)) ", " (expr->pine (nth form 2)) ", " (expr->pine (nth form 3)) ")"))
 (defmethod expr->pine :sort  [form] (str "array.sort(" (expr->pine (second form)) ")"))
 
+;; P3: array.fill / array.reverse
+(defmethod expr->pine :array.fill   [form] (str "array.fill(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :array.reverse [form] (str "array.reverse(" (expr->pine (second form)) ")"))
+
 ;; P3: Extended array operations
 (doseq [[sym pine arity] [['array.insert "array.insert" 3] ['array.remove "array.remove" 2]
                           ['array.clear "array.clear" 1] ['array.concat "array.concat" 2]
@@ -677,6 +696,29 @@
   (defmethod expr->pine sym [form]
     (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
 
+;; P3: Color component extractors
+(doseq [[sym pine] [['color.r "color.r"] ['color.g "color.g"]
+                    ['color.b "color.b"] ['color.t "color.t"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; P3: Matrix extended (fill, det, rank, pinv)
+(doseq [[sym pine] [['matrix.fill "matrix.fill"] ['matrix.det "matrix.det"]
+                    ['matrix.rank "matrix.rank"] ['matrix.pinv "matrix.pinv"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; P3: Drawing object getters
+(doseq [[sym pine] [['line.get-x1 "line.get_x1"] ['line.get-x2 "line.get_x2"]
+                    ['line.get-y1 "line.get_y1"] ['line.get-y2 "line.get_y2"]
+                    ['line.get-price "line.get_price"]
+                    ['label.get-x "label.get_x"] ['label.get-y "label.get_y"]
+                    ['label.get-text "label.get_text"]
+                    ['box.get-left "box.get_left"] ['box.get-top "box.get_top"]
+                    ['box.get-right "box.get_right"] ['box.get-bottom "box.get_bottom"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
 ;; P4: time_close / time_tradingday
 (defmethod expr->pine :time.close [form]
   (str "time_close" (when (number? (second form)) (str "[" (second form) "]"))))
@@ -762,6 +804,7 @@
         sets     (by-type :set!)
         multis   (by-type :multiset)
         secs     (by-type :security)
+        switches (by-type :switch)
         inputs   (concat (by-type :input-int) (by-type :input-float) (by-type :input-bool)
                         (by-type :input-string) (by-type :input-color) (by-type :input-source)
                         (by-type :input-symbol) (by-type :input-timeframe))
@@ -781,6 +824,8 @@
          (when (seq defs)    (str (str/join "\n" (map expr->pine defs)) "\n"))
          (when (seq multis)  (str (str/join "\n" (map expr->pine multis)) "\n"))
          (when (seq secs)    (str (str/join "\n" (map expr->pine secs)) "\n"))
+         ;; Switch blocks
+         (when (seq switches) (str (str/join "\n\n" (map expr->pine switches)) "\n"))
          ;; Set! assignments (inside on-bar before logic)
          (when (seq sets)    (str (str/join "\n" (map expr->pine sets)) "\n"))
          (when-let [exports (seq (by-type :export))]
