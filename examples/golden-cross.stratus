@@ -1,0 +1,18 @@
+;; Stratus — Golden Cross Strategy Example
+;; Compile: bb stratus compile examples/golden-cross.stratus
+
+(strategy "Golden Cross"
+  :default-qty 100
+  :pyramiding 1)
+
+(def fast (sma 50))
+(def slow (sma 200))
+
+(on-bar
+  (when (crosses-above fast slow)
+    (long "ENTER"))
+  (when (crosses-below fast slow)
+    (close "EXIT")))
+
+(plot fast "Fast MA" :color blue :linewidth 2)
+(plot slow "Slow MA" :color red :linewidth 2)

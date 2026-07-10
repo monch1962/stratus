@@ -1,0 +1,27 @@
+;; Stratus — RSI Divergence Indicator Example
+
+(indicator "RSI Divergence Detector"
+  :overlay false
+  :precision 2)
+
+(def rsi-val (rsi 14))
+(def overbought 70)
+(def oversold 30)
+
+(def bullish-div
+  (and (falling rsi-val)
+       (> (close) (close 1))))
+
+(def bearish-div
+  (and (rising rsi-val)
+       (< (close) (close 1))))
+
+(plot rsi-val "RSI" :color purple :linewidth 2)
+(hline overbought "Overbought" :color red :linestyle dashed)
+(hline oversold "Oversold" :color green :linestyle dashed)
+
+(plotshape bullish-div "Bullish" :location bottom :color green :style triangle-up)
+(plotshape bearish-div "Bearish" :location top :color red :style triangle-down)
+
+(alertcondition bullish-div "Bullish divergence")
+(alertcondition bearish-div "Bearish divergence")

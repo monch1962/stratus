@@ -1,0 +1,4 @@
+{:paths ["src" "test"]
+ :deps {}
+ :tasks
+ {test (clojure -M -m stratus.core-test)}}

@@ -1,0 +1,5 @@
+*.pine
+/.hg/
+/.svn/
+*~
+.DS_Store

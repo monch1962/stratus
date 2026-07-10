@@ -1,0 +1,31 @@
+;; Stratus — Adaptive Regime Trader Example
+;; Uses ADX to detect trend vs mean-reversion regimes
+
+(strategy "Adaptive Regime Trader"
+  :default-qty 100
+  :pyramiding 0)
+
+(def trend-adx (adx 14))
+(def trend-threshold 25)
+(def mr-threshold 20)
+
+;; Detect regime state
+(def in-trend (> trend-adx trend-threshold))
+(def in-meanrev (< trend-adx mr-threshold))
+
+(on-bar
+  ;; Trend regime: follow the trend
+  (when (and in-trend (not (rising in-trend 1)))
+    (long "TREND"))
+  (when (and (not in-trend) (rising in-trend 1))
+    (close "TREND"))
+
+  ;; Mean-reversion regime: fade the move
+  (when (and in-meanrev (falling (rsi 14)))
+    (long "MR"))
+  (when (and in-meanrev (rising (rsi 14)))
+    (close "MR")))
+
+(plot trend-adx "ADX" :color orange :linewidth 2)
+(hline trend-threshold "Trend Threshold" :color gray :linestyle dashed)
+(hline mr-threshold "MR Threshold" :color gray :linestyle dotted)
