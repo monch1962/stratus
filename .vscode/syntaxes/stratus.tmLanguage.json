@@ -1,0 +1,66 @@
+{
+  "scopeName": "source.stratus",
+  "name": "Stratus",
+  "fileTypes": ["stratus"],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#strings" },
+    { "include": "#keywords" },
+    { "include": "#builtins" },
+    { "include": "#numbers" },
+    { "include": "#colors" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        { "match": ";.*$", "name": "comment.line.semicolon.stratus" }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        { "begin": "\"", "end": "\"", "name": "string.quoted.double.stratus" }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        { "match": "\\b(strategy|indicator|library|def|defvar|defvarip|set!|defn|export|on-bar|when|if|else|do|for|while|switch|multiset)\\b", "name": "keyword.control.stratus" },
+        { "match": "\\b(plot|plotshape|hline|bgcolor|barcolor|fill|alertcondition)\\b", "name": "support.function.plot.stratus" },
+        { "match": "\\b(long|short|close|exit|order|cancel)\\b", "name": "keyword.other.strategy.stratus" },
+        { "match": "\\b(sma|ema|rsi|macd|adx|stoch|bb|atr|wma|vwma|hma|alma|supertrend|sar|vwap|stdev|cci|mfi|obv|linreg)\\b", "name": "support.function.indicator.stratus" },
+        { "match": "\\b(crosses-above|crosses-below|rising|falling|and|or|not|na|nz|iff|change|mom|cum|fixnan|valuewhen|highest|lowest|highestbars|lowestbars|sum|avg|correlation|covariance|median|mode|percentile|log|log10|exp|sqrt|abs|ceil|floor|round|pow|min|max|sign|tostring|in-session)\\b", "name": "support.function.builtin.stratus" },
+        { "match": "\\b(input-int|input-float|input-bool|input-string|input-color|input-source|input-symbol|input-timeframe)\\b", "name": "support.function.input.stratus" },
+        { "match": "\\b(line\\.new|line\\.delete|label\\.new|box\\.new|table\\.new|table-cell)\\b", "name": "support.function.drawing.stratus" },
+        { "match": "\\b(array-int|array-float|push|pop|size|get|set|sort)\\b", "name": "support.function.array.stratus" },
+        { "match": "\\b(security|dividends|splits|earnings|in-session)\\b", "name": "support.function.data.stratus" },
+        { "match": "\\b(rgb|from-gradient|color)\\b", "name": "support.function.color.stratus" }
+      ]
+    },
+    "builtins": {
+      "patterns": [
+        { "match": "\\b(close|high|low|open|volume|hl2|hlc3|ohlc4)\\b", "name": "variable.language.price.stratus" },
+        { "match": "\\b(time|dayofweek|month|hour|bar-index|ticker|timeframe)\\b", "name": "variable.language.time.stratus" },
+        { "match": "\\b(bar-confirmed|bar-first|bar-last)\\b", "name": "variable.language.barstate.stratus" },
+        { "match": "\\b(position-size|position-avg-price|open-trades|equity|net-profit|allow-entry-in|max-intraday-orders)\\b", "name": "variable.language.strategy.stratus" },
+        { "match": "\\b(mintick|pointvalue|sym-session|sym-description|sym-type)\\b", "name": "variable.language.syminfo.stratus" }
+      ]
+    },
+    "colors": {
+      "patterns": [
+        { "match": ":(red|green|blue|yellow|orange|purple|pink|gray|white|black|navy|teal|lime|maroon)\\b", "name": "constant.other.color.stratus" },
+        { "match": ":(dashed|dotted|solid|line|histogram|area|columns|circles|cross|step-line|step-line-diamond|triangle-up|triangle-down|top|bottom|absolute)\\b", "name": "constant.other.style.stratus" }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        { "match": "\\b-?\\d+(\\.\\d+)?\\b", "name": "constant.numeric.stratus" }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        { "match": "[()]", "name": "punctuation.parenthesis.stratus" },
+        { "match": "[\\[\\]]", "name": "punctuation.bracket.stratus" }
+      ]
+    }
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "stratus",
+  "displayName": "Stratus — Pine Script DSL",
+  "description": "Syntax highlighting for .stratus files (LISP-syntax Strategy DSL for Pine Script)",
+  "version": "0.1.0",
+  "publisher": "monch1962",
+  "license": "MIT",
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [{
+      "id": "stratus",
+      "aliases": ["Stratus", "stratus"],
+      "extensions": [".stratus"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "stratus",
+      "scopeName": "source.stratus",
+      "path": "./syntaxes/stratus.tmLanguage.json"
+    }]
+  }
+}

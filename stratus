@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Stratus CLI wrapper — invokes Babashka under the hood.
+# Usage: ./stratus compile <file.stratus> [-o <file.pine>] [-c|--clip]
+#        ./stratus watch   <file.stratus> [-o <file.pine>] [-c|--clip]
+#        ./stratus list
+#        ./stratus new     <type> [name]
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if ! command -v bb &>/dev/null; then
+  echo "Error: Babashka is required but not installed."
+  echo "Install: brew install borkdude/brew/babashka"
+  echo "   Or:   https://babashka.org/"
+  exit 1
+fi
+
+exec bb -m stratus.core "$@"
