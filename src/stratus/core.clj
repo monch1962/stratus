@@ -2,10 +2,12 @@
   (:require [stratus.reader :as reader]
             [stratus.generator :as gen]
             [stratus.constructs :as constructs]
+            [stratus.importer :as imp]
+            [stratus.simulator :as sim]
             [clojure.string :as str])
   (:gen-class))
 
-(declare safe-compile)
+(declare safe-compile run-simulation)
 
 ;; ─── Cross-platform clipboard ───────────────────────────────────────
 
@@ -132,6 +134,8 @@
   (println "Usage:")
   (println "  compile <file.stratus>  [-o <file.pine>]  Compile to Pine Script")
   (println "                          [-c|--clip]       Copy to clipboard")
+  (println "  import  <file.pine>     [-o <file.stratus>]  Convert Pine to Stratus")
+  (println "  simulate <file.stratus> [--bars N]        Simulate strategy")
   (println "  watch   <file.stratus>  [-o <file.pine>]  Watch for changes")
   (println "                          [-c|--clip]       Auto-copy on save")
   (println "  new     <type> [name]                    Generate scaffold")
@@ -140,10 +144,10 @@
   (println "Types: strategy, indicator, library")
   (println)
   (println "Quick start:")
-  (println "  ./stratus new strategy \"Breakout\"")
-  (println "  ./stratus compile breakout.stratus --clip")
-  (println "  ./stratus watch breakout.stratus --clip")
-  (println "  ./stratus list"))
+  (println "  ./stratus import my-strategy.pine -o my.stratus    Convert existing")
+  (println "  ./stratus compile my.stratus --clip               Compile to clipboard")
+  (println "  ./stratus simulate my.stratus                     Backtest strategy")
+  (println "  ./stratus new strategy \"Breakout\"                 New from scratch"))
 
 (defn compile-strategy
   [in-path args]
@@ -178,6 +182,70 @@
           (println (str "    " (name (:name c)) "  " (or (:summary c) (:doc c) ""))))
         (println)))))
 
+;; ─── Import ────────────────────────────────────────────────────────
+
+(defn import-strategy
+  "Convert a Pine Script file to Stratus DSL."
+  [in-path args]
+  (let [args-vec  (vec args)
+        out-idx   (some #(let [i (.indexOf args-vec %)] (when (>= i 0) i)) ["-o" "--output"])
+        out-path  (or (and out-idx (< (inc out-idx) (count args-vec)) (nth args-vec (inc out-idx)))
+                      (str/replace in-path #"\.pine$" ".stratus"))
+        source    (slurp in-path)
+        dsl       (imp/convert source)]
+    (spit out-path dsl)
+    (println "✓ Converted" in-path "→" out-path)))
+
+;; ─── Simulate ──────────────────────────────────────────────────────
+
+(defn make-sim-bars
+  "Generate synthetic bars for simulation."
+  [n & {:keys [trend volatility start]
+        :or {trend 0.002, volatility 0.01, start 100.0}}]
+  (let [rng (java.util.Random. 42)]
+    (reductions
+      (fn [prev _]
+        (let [ret (+ trend (* volatility (.nextGaussian rng)))
+              prev-close (:close prev)
+              c (max 0.5 (* prev-close (Math/exp ret)))
+              h (max c (* c (+ 1 (* volatility (.nextGaussian rng) 0.3))))
+              l (min c (* c (- 1 (* volatility (.nextGaussian rng) 0.3))))
+              o (+ l (* (- h l) (.nextFloat rng)))]
+          {:open o, :high h, :low l, :close c, :volume (int (+ 1000 (* 500 (.nextGaussian rng))))}))
+      {:open start, :high start, :low start, :close start, :volume 1000}
+      (range (dec n)))))
+
+(defn run-simulation
+  "Run a .stratus file through the simulator."
+  [in-path args]
+  (let [args-vec  (vec args)
+        n-idx     (some #(let [i (.indexOf args-vec %)] (when (>= i 0) i)) ["--bars"])
+        n-bars    (if (and n-idx (< (inc n-idx) (count args-vec)))
+                    (Integer/parseInt (nth args-vec (inc n-idx))) 300)
+        source    (slurp in-path)
+        forms     (reader/parse source)
+        ;; Extract do-like from the parsed forms (skip strategy header)
+        body      (filter #(not (and (list? %) (#{:strategy :indicator :library} (first %)))) forms)
+        strategy-do (cons 'do body)
+        orders    (atom [])
+        bars      (make-sim-bars n-bars)
+        result    (sim/simulate bars strategy-do
+                    :on-bar (fn [state form]
+                              (case (first form)
+                                long  (swap! orders conj {:bar (:bar-count state), :action :buy})
+                                short (swap! orders conj {:bar (:bar-count state), :action :sell})
+                                close (swap! orders conj {:bar (:bar-count state), :action :sell})
+                                nil))
+                    :on-result (fn [state] state))]
+    (println "┌──────────────────────────────────────┐")
+    (println "│ Simulation Results                    │")
+    (println "├──────────────────────────────────────┤")
+    (println (str "│  File:         " (max 0 (- 36 (count in-path))) (apply str (repeat (- 37 (count in-path)) " ")) "│"))
+    (println (str "│  Bars:         " n-bars (apply str (repeat (- 36 (count (str n-bars))) " ")) "│"))
+    (println (str "│  Trades:       " (:total-trades result) (apply str (repeat (- 35 (count (str (:total-trades result)))) " ")) "│"))
+    (println (str "│  Net P&L:      " (format "%.2f" (double (:net-profit result))) (apply str (repeat (- 35 (count (format "%.2f" (double (:net-profit result))))) " ")) "│"))
+    (println "└──────────────────────────────────────┘")))
+
 (defn -main
   [& args]
   (let [cmd (first args)
@@ -203,4 +271,15 @@
                 (println "Usage: bb -m stratus.core new <type> [name]\n  Types: strategy, indicator, library")))
 
       "list" (list-constructs)
+
+      "import" (let [in-path (first rest-args)]
+                 (if in-path
+                   (import-strategy in-path (vec rest-args))
+                   (println "Usage: bb -m stratus.core import <file.pine> [-o file.stratus]")))
+
+      "simulate" (let [in-path (first rest-args)]
+                   (if in-path
+                     (run-simulation in-path (vec rest-args))
+                     (println "Usage: bb -m stratus.core simulate <file.stratus> [--bars N]")))
+
       (usage))))
