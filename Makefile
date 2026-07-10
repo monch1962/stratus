@@ -16,8 +16,11 @@ help:
 all: test compile
 
 test:
-	@echo "Running tests..."
+	@echo "Running all tests..."
 	$(BB) -m stratus.core-test
+	$(BB) -m stratus.p0p1-test
+	$(BB) -m stratus.p1p2-test
+	$(BB) -m stratus.remaining-test
 
 compile:
 	@echo "Compiling examples..."

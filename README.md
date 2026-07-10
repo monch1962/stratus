@@ -28,7 +28,14 @@ cd ~/Projects/stratus
 
 # Run tests to verify everything works
 bb -m stratus.core-test
-# → Ran 17 tests, 166 assertions, 0 failures
+# → Ran 55 tests, 373 assertions, 0 failures
+bb -m stratus.p0p1-test
+bb -m stratus.p1p2-test
+bb -m stratus.remaining-test
+# → 108 total tests, 539 assertions, 0 failures
+
+# Or use the Makefile
+make test
 
 # List available DSL constructs
 bb -m stratus.core list

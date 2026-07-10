@@ -34,38 +34,30 @@
    :allow-entry-in "strategy.risk.allow_entry_in",
    :max-intraday-orders "strategy.risk.max_intraday_filled_orders"})
 
+;; ─── Fundamental data requests ─────────────────────────────────────
+
 (def fundamental-requests
   {:dividends "request.dividends(syminfo.tickerid)",
    :splits "request.splits(syminfo.tickerid)",
    :earnings "request.earnings(syminfo.tickerid)"})
 
-(def strategy-builtins
-  {:position-size "strategy.position_size", :position-avg-price "strategy.position_avg_price",
-   :open-trades "strategy.opentrades", :equity "strategy.equity",
-   :net-profit "strategy.netprofit"})
+;; ─── Source resolver ───────────────────────────────────────────────
 
 (def resolve-source
   (fn [form]
-    (cond (symbol? form)   (or (builtin-sources form) (strategy-builtins form) (name form))
+    (cond (symbol? form)   (or (builtin-sources (keyword (name form)))
+                               (get strategy-builtins-map (keyword (name form)))
+                               (name form))
           (keyword? form)  (or (builtin-sources form) (name form))
           (list? form)     (expr->pine form)
           :otherwise       (throw (ex-info "Unknown source" {:form form})))))
+
+;; ─── Arg parser ────────────────────────────────────────────────────
 
 (defn parse-kwargs [args]
   (loop [pos [], kw {}, rem args]
     (if (empty? rem)
       {:positional pos, :keyword kw}
-      (if (keyword? (first rem))
-        (if (next rem)
-          (recur pos (assoc kw (first rem) (second rem)) (drop 2 rem))
-          (recur pos kw (rest rem)))
-        (recur (conj pos (first rem)) kw (rest rem))))))
-
-(defn parse-kwargs-until [args stop-kw]
-  "Like parse-kwargs but stops processing at a specific keyword (e.g. :else)."
-  (loop [pos [], kw {}, rem args]
-    (if (or (empty? rem) (= (first rem) stop-kw))
-      {:positional pos, :keyword kw, :remaining rem}
       (if (keyword? (first rem))
         (if (next rem)
           (recur pos (assoc kw (first rem) (second rem)) (drop 2 rem))
