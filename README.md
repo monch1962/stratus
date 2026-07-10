@@ -1,9 +1,9 @@
-# Stratus — LISP-Syntax Strategy DSL for Pine Script
+# Stratus — LISP-Syntax DSL for Pine Script
 
-**Write trading strategies in LISP syntax. Generate idiomatic Pine Script v6.
+**Write TradingView indicators and strategies in LISP syntax. Generate idiomatic Pine Script v6.
 Test with Clojure's full ecosystem. Import existing Pine. Simulate backtests.**
 
-Stratus lets you author TradingView indicators and strategies using parenthesized
+Stratus lets you author both **indicators** and **strategies** using parenthesized
 LISP-style syntax (`.stratus` files) and produces clean, production-ready Pine Script v6.
 Because the DSL source is valid Clojure/EDN data, you get **unit testing,
 property-based testing, CI integration, and backtesting** — none of which exist
@@ -23,7 +23,7 @@ cd stratus
 make test
 # → 234 tests, 0 failures
 
-# Write your first strategy
+# Write a strategy
 cat > crossover.stratus << 'EOF'
 (strategy "Crossover" :default-qty 100)
 (def fast (sma 50))
@@ -35,6 +35,16 @@ cat > crossover.stratus << 'EOF'
 (plot slow "Slow MA" :color red :linewidth 2)
 EOF
 
+# Or write an indicator
+cat > rsi-indicator.stratus << 'EOF'
+(indicator "RSI Detector" :overlay false :precision 2)
+(input-int "RSI Period" :def 14)
+(def r (rsi rsi-period))
+(plot r "RSI" :color purple :linewidth 2)
+(hline 70 "Overbought" :color red :linestyle dashed)
+(hline 30 "Oversold" :color green :linestyle dashed)
+EOF
+
 # Compile and copy to clipboard
 ./stratus compile crossover.stratus --clip
 
@@ -43,9 +53,15 @@ EOF
 
 # Or backtest
 ./stratus simulate crossover.stratus --bars 500
+# ┌──────────────────────────────────────┐
+# │ Simulation Results                    │
+# ├──────────────────────────────────────┤
+# │  Trades:       12                    │
+# │  Net P&L:      +3.42                 │
+# └──────────────────────────────────────┘
 ```
 
-Open TradingView → Pine Editor → **Ctrl+V** → **Ctrl+S** — your strategy is live.
+Open TradingView → Pine Editor → **Ctrl+V** → **Ctrl+S** — your indicator or strategy is live.
 
 ---
 
