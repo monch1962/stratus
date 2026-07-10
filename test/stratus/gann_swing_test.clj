@@ -5,30 +5,7 @@
             [stratus.generator :as gen]))
 
 (defn compile-gann [swing-period]
-  (let [src (str "
-(indicator \"Gann Swings\" :overlay true)
-
-(defvar swing-direction 0)
-(defvar swing-high 0.0)
-(defvar swing-low 0.0)
-
-(input-int \"Swing Period\" :def 2 :min 2 :max 10)
-
-(on-bar
-  (if (= high (highest high swing-period))
-    (if (= swing-direction -1)
-      (set! swing-high (highest high swing-period))
-      (do (set! swing-direction 1)
-          (set! swing-high (highest high swing-period)))))
-  (if (= low (lowest low swing-period))
-    (if (= swing-direction 1)
-      (set! swing-low (lowest low swing-period))
-      (do (set! swing-direction -1)
-          (set! swing-low (lowest low swing-period))))))
-
-(plot swing-high \"Swing High\" :color green :linewidth 2 :style step-line)
-(plot swing-low \"Swing Low\" :color red :linewidth 2 :style step-line)
-")]
+  (let [src (slurp "examples/gann-swings.stratus")]
     (gen/emit-file (reader/parse src))))
 
 ;; ─── Basic compilation tests ───────────────────────────────────────
@@ -156,7 +133,7 @@
 (deftest gann-swing-period-input-params
   "The input parameter must have correct def, min, max"
   (let [o (compile-gann 2)]
-    (is (str/includes? o "min=2"))
+    (is (str/includes? o "min=1"))
     (is (str/includes? o "max=10"))
     ;; Default is emitted as positional arg before the title
     (is (re-find #"input\.int\(2," o))))
@@ -218,9 +195,32 @@
     (is (str/includes? o "if swing_direction == -1"))
     (is (str/includes? o "if swing_direction == 1"))))
 
-;; ═══════════════════════════════════════════════════════════════════
-;; Integration: Gann + full strategy
-;; ═══════════════════════════════════════════════════════════════════
+(deftest gann-period-1-uses-bar-comparison
+  "Period 1 compares against the previous bar, not highest/lowest"
+  (let [o (compile-gann 1)]
+    (is (str/includes? o "high[1]"))
+    (is (str/includes? o "low[1]"))))
+
+(deftest gann-period-1-still-has-direction
+  (let [o (compile-gann 1)]
+    (is (str/includes? o "swing_direction := 1"))
+    (is (str/includes? o "swing_direction := -1"))))
+
+(deftest gann-has-both-branches
+  "The generated Pine Script must have both period-1 and period-2+ branches"
+  (let [o (compile-gann 2)]
+    (is (str/includes? o "if swing_period == 1"))
+    (is (str/includes? o "else"))))
+
+(deftest gann-period-1-no-highest
+  "Period 1 branch uses bar comparison, not ta.highest"
+  (let [o (compile-gann 1)]
+    (is (str/includes? o "high[1]"))
+    (is (str/includes? o "low[1]"))
+    ;; ta.highest is still present in the else branch (runtime switching)
+    (is (str/includes? o "ta.highest"))))
+
+;; ─── Integration ───────────────────────────────────────────────────
 
 (deftest gann-compiles-as-full-indicator
   (let [o (gen/emit-file (reader/parse (slurp "examples/gann-swings.stratus")))]

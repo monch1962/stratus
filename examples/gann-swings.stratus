@@ -1,5 +1,7 @@
 ;; Stratus — Gann Swings Indicator
 ;; Identifies swing highs and lows with configurable lookback period.
+;; Period 1  : compares each bar against its immediate predecessor
+;; Period 2+ : uses ta.highest/ta.lowest over N bars
 ;; Demonstrates: defvar, set!, if/else, input-int, highest, lowest,
 ;;              comparison operators, plot with step-line style
 
@@ -7,7 +9,7 @@
   :overlay true)
 
 ;; Configuration
-(input-int "Swing Period" :def 2 :min 2 :max 10)
+(input-int "Swing Period" :def 2 :min 1 :max 10)
 
 ;; Persistent state
 (defvar swing-direction 0)
@@ -15,18 +17,32 @@
 (defvar swing-low 0.0)
 
 (on-bar
-  ;; Current bar's high is the highest of the last N bars → swing high
-  (if (= high (highest high swing-period))
-    (if (= swing-direction -1)
-      (set! swing-high (highest high swing-period))
-      (do (set! swing-direction 1)
-          (set! swing-high (highest high swing-period)))))
-  ;; Current bar's low is the lowest of the last N bars → swing low
-  (if (= low (lowest low swing-period))
-    (if (= swing-direction 1)
-      (set! swing-low (lowest low swing-period))
-      (do (set! swing-direction -1)
-          (set! swing-low (lowest low swing-period))))))
+  ;; Period 1: compare against previous bar
+  (if (= swing-period 1)
+    (do
+      (if (> high (high 1))
+        (if (= swing-direction -1)
+          (set! swing-high high)
+          (do (set! swing-direction 1)
+              (set! swing-high high))))
+      (if (< low (low 1))
+        (if (= swing-direction 1)
+          (set! swing-low low)
+          (do (set! swing-direction -1)
+              (set! swing-low low)))))
+    :else
+    ;; Period 2+: use highest/lowest over the lookback window
+    (do
+      (if (= high (highest high swing-period))
+        (if (= swing-direction -1)
+          (set! swing-high (highest high swing-period))
+          (do (set! swing-direction 1)
+              (set! swing-high (highest high swing-period)))))
+      (if (= low (lowest low swing-period))
+        (if (= swing-direction 1)
+          (set! swing-low (lowest low swing-period))
+          (do (set! swing-direction -1)
+              (set! swing-low (lowest low swing-period))))))))
 
 ;; Visualisation
 (plot swing-high "Swing High" :color green :linewidth 2 :style step-line)
