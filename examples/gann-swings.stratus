@@ -1,0 +1,33 @@
+;; Stratus — Gann Swings Indicator
+;; Identifies swing highs and lows with configurable lookback period.
+;; Demonstrates: defvar, set!, if/else, input-int, highest, lowest,
+;;              comparison operators, plot with step-line style
+
+(indicator "Gann Swings"
+  :overlay true)
+
+;; Configuration
+(input-int "Swing Period" :def 2 :min 2 :max 10)
+
+;; Persistent state
+(defvar swing-direction 0)
+(defvar swing-high 0.0)
+(defvar swing-low 0.0)
+
+(on-bar
+  ;; Current bar's high is the highest of the last N bars → swing high
+  (if (= high (highest high swing-period))
+    (if (= swing-direction -1)
+      (set! swing-high (highest high swing-period))
+      (do (set! swing-direction 1)
+          (set! swing-high (highest high swing-period)))))
+  ;; Current bar's low is the lowest of the last N bars → swing low
+  (if (= low (lowest low swing-period))
+    (if (= swing-direction 1)
+      (set! swing-low (lowest low swing-period))
+      (do (set! swing-direction -1)
+          (set! swing-low (lowest low swing-period))))))
+
+;; Visualisation
+(plot swing-high "Swing High" :color green :linewidth 2 :style step-line)
+(plot swing-low "Swing Low" :color red :linewidth 2 :style step-line)
