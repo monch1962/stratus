@@ -221,6 +221,23 @@
     (str "ta.bb(close, " p ", " m ")")))
 (defmethod expr->pine :atr  [form] (str "ta.atr(" (or (some-> (second form) str) "14") ")"))
 
+;; P2: cross, tr, range, roc
+(defmethod expr->pine :cross    [form]
+  (str "ta.cross(" (expr->pine (nth form 1)) ", " (expr->pine (nth form 2)) ")"))
+(defmethod expr->pine :tr       [form]
+  (if (> (count form) 1) (str "ta.tr(" (expr->pine (second form)) ")") "ta.tr"))
+(defmethod expr->pine :range    [form]
+  (if (> (count form) 2) (str "ta.range(" (expr->pine (nth form 1)) ", " (expr->pine (nth form 2)) ")") "ta.range"))
+(defmethod expr->pine :roc      [form] (indicator-call form "ta.roc" "close"))
+
+;; P2: MA variants
+(defmethod expr->pine :swma [form]
+  (let [s (some-> (second form) name)] (str "ta.swma(" (or s "close") ")")))
+(defmethod expr->pine :rma  [form] (indicator-call form "ta.rma" "close"))
+(defmethod expr->pine :tema [form] (indicator-call form "ta.tema" "close"))
+(defmethod expr->pine :dema [form] (indicator-call form "ta.dema" "close"))
+(defmethod expr->pine :smma [form] (indicator-call form "ta.smma" "close"))
+
 ;; P1 indicators
 (defmethod expr->pine :supertrend [form]
   (let [f (or (some-> (second form) str) "3")
@@ -346,6 +363,11 @@
 (defmethod expr->pine :close [form]
   (if-let [l (second form)] (str "strategy.close(\"" l "\")") "strategy.close()"))
 
+;; P1: close_all / reverse
+(defmethod expr->pine :close-all [form] "strategy.close_all()")
+(defmethod expr->pine :reverse [form]
+  (if-let [l (second form)] (str "strategy.reverse(\"" l "\")") "strategy.reverse()"))
+
 ;; P0: strategy.exit()
 (defmethod expr->pine :exit [form]
   (let [label (second form)
@@ -356,7 +378,7 @@
                               [(case k
                                  :trail :trail_points
                                  :trail-offset :trail_offset
-                                 :from :from
+                                 :from :from_entry
                                  :loss :loss
                                  :profit :profit
                                  :stop :stop
@@ -422,23 +444,31 @@
 
 (defmethod expr->pine :if [form]
   (let [branches (rest form)]
-    (loop [rem branches, lines [], depth 0]
+    (loop [rem branches, lines [], idx 0]
       (if (empty? rem)
         (str/join "\n" lines)
         (let [cond (first rem)
               action (second rem)]
           (if (= cond :else)
-            ;; else clause: one or more actions
-            (let [actions (if (and (list? action) (= (first action) :do)) (rest action) [action])
-                  indent (apply str (repeat depth "    "))
-                  action-lines (map #(str indent "    " (expr->pine %)) actions)]
-              (recur (drop 2 rem) (into lines (cons (str indent "else") action-lines)) depth))
+            ;; else clause — same indent as parent if
+            (let [actions (if (and (list? action) (= (first action) 'do)) (rest action) [action])
+                  action-lines (mapcat (fn [a]
+                                        (map #(str "    " %)
+                                             (str/split-lines (expr->pine a))))
+                                      actions)]
+              (recur (drop 2 rem) (into lines (cons "else" action-lines)) idx))
             ;; if or else-if clause
-            (let [prefix (if (zero? depth) "if " "else if ")
-                  actions (if (and (list? action) (= (first action) :do)) (rest action) [action])
-                  indent (apply str (repeat depth "    "))
-                  action-lines (map #(str indent "    " (expr->pine %)) actions)]
-              (recur (drop 2 rem) (into lines (cons (str prefix (expr->pine (first rem))) action-lines)) (inc depth)))))))))
+            (let [prefix (if (zero? idx) "if " "else if ")
+                  actions (if (and (list? action) (= (first action) 'do)) (rest action) [action])
+                  action-lines (mapcat (fn [a]
+                                        (map #(str "    " %)
+                                             (str/split-lines (expr->pine a))))
+                                      actions)]
+              (recur (drop 2 rem) (into lines (cons (str prefix (expr->pine cond)) action-lines)) (inc idx)))))))))
+  ;; Note: idx tracks "if" vs "else if" prefix only.
+  ;; All branch lines are unindented (relative 0).
+  ;; All body lines get a fixed 4-space indent.
+  ;; Nested ifs inside bodies get their own (expr->pine) call.
 
 ;; ─── On-Bar Block (extended with if/else support) ──────────────────
 
@@ -488,6 +518,21 @@
 (defmethod expr->pine :box.new [form]
   (let [{:keys [positional keyword]} (parse-kwargs (drop 1 form))]
     (str "box.new(" (str/join ", " (map expr->pine positional)) (emit-kwargs keyword) ")")))
+
+;; P2: Drawing object setters and deleters
+(defmethod expr->pine :line.set-color    [form] (str "line.set_color(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :line.set-width    [form] (str "line.set_width(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :line.set-extend   [form] (str "line.set_extend(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :line.set-style    [form] (str "line.set_style(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :label.set-color   [form] (str "label.set_color(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :label.set-text    [form] (str "label.set_text(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :label.set-x       [form] (str "label.set_x(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :label.set-y       [form] (str "label.set_y(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :label.delete      [form] (str "label.delete(" (expr->pine (second form)) ")"))
+(defmethod expr->pine :box.set-color     [form] (str "box.set_color(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :box.set-border-color [form] (str "box.set_border_color(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :box.set-width     [form] (str "box.set_width(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :box.delete        [form] (str "box.delete(" (expr->pine (second form)) ")"))
 
 ;; ─── P4: color.rgb / from-gradient / tostring ──────────────────────
 (defmethod expr->pine :rgb [form]
