@@ -1,0 +1,46 @@
+name: Release
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: borkdude/setup-babashka@v2
+        with:
+          babashka-version: 1.12.218
+      - name: Build
+        run: make test
+      - name: Package VS Code extension
+        run: |
+          cd .vscode
+          zip -r ../stratus-vscode.zip package.json language-configuration.json syntaxes/
+          cd ..
+      - name: Package release
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          tar czf stratus-$VERSION.tar.gz \
+            stratus Makefile bb.edn src/ examples/ .vscode/ \
+            -C test .
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            stratus-*.tar.gz
+            stratus-vscode.zip
+          body: |
+            ## Stratus ${{ github.ref_name }}
+
+            See [CHANGELOG.md](CHANGELOG.md) for details.
+
+            ### Quick install
+            ```bash
+            brew install borkdude/brew/babashka
+            curl -LO https://github.com/monch1962/stratus/releases/download/${{ github.ref_name }}/stratus-${{ github.ref_name#v }}.tar.gz
+            tar xzf stratus-${{ github.ref_name#v }}.tar.gz
+            cd stratus
+            ./stratus compile examples/golden-cross.stratus
+            ```
