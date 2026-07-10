@@ -22,6 +22,7 @@ test:
 	$(BB) -m stratus.p1p2-test
 	$(BB) -m stratus.remaining-test
 	$(BB) -m stratus.gann-swing-test
+	$(BB) -m stratus.exporter-test
 
 compile:
 	@echo "Compiling examples..."
