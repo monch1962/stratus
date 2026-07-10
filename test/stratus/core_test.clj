@@ -353,6 +353,216 @@
           (str "Failed for color " c)))))
 
 ;; ═══════════════════════════════════════════════════════════════════
+;; Coverage: Additional Indicator Tests
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest gen-wma
+  (is (= (gen/expr->pine '(wma 14)) "ta.wma(close, 14)"))
+  (is (= (gen/expr->pine '(wma high 14)) "ta.wma(high, 14)")))
+
+(deftest gen-hma
+  (is (= (gen/expr->pine '(hma 20)) "ta.hma(close, 20)")))
+
+(deftest gen-vwma
+  (is (= (gen/expr->pine '(vwma 14)) "ta.vwma(close, 14)")))
+
+(deftest gen-alma
+  (is (= (gen/expr->pine '(alma 10 6 0.85)) "ta.alma(close, 10, 6, 0.85)")))
+
+(deftest gen-supertrend
+  (is (= (gen/expr->pine '(supertrend 3 10)) "ta.supertrend(3, 10)")))
+
+(deftest gen-sar
+  (is (= (gen/expr->pine '(sar 0.02 0.2)) "ta.sar(0.02, 0.2)")))
+
+(deftest gen-stdev
+  (is (= (gen/expr->pine '(stdev 20)) "ta.stdev(close, 20)")))
+
+(deftest gen-mfi
+  (is (= (gen/expr->pine '(mfi hlc3 14)) "ta.mfi(hlc3, 14)"))
+  (is (= (gen/expr->pine '(mfi close 14)) "ta.mfi(close, 14)")))
+
+(deftest gen-cci
+  (is (= (gen/expr->pine '(cci close 20)) "ta.cci(close, 20)"))
+  (is (= (gen/expr->pine '(cci high 14)) "ta.cci(high, 14)")))
+
+(deftest gen-obv
+  (is (= (gen/expr->pine '(obv)) "ta.obv")))
+
+(deftest gen-linreg
+  (is (= (gen/expr->pine '(linreg 20)) "ta.linreg(close, 20)")))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Coverage: Strategy Exit, Order, Cancel
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest gen-strategy-exit
+  (is (= (gen/expr->pine '(exit "X" :from "E" :loss 100 :profit 200))
+         "strategy.exit(\"X\", from=\"E\", loss=100, profit=200)"))
+  (is (= (gen/expr->pine '(exit "T" :from "E" :trail 50 :trail-offset 10))
+         "strategy.exit(\"T\", from=\"E\", trail_points=50, trail_offset=10)")))
+
+(deftest gen-strategy-order
+  ;; Order uses :direction + keyword args; qty is not extracted from positional
+  (is (= (gen/expr->pine '(order "O" :long :limit 50.25))
+         "strategy.order(\"O\", strategy.long, limit=50.25)")))
+
+(deftest gen-strategy-cancel
+  (is (= (gen/expr->pine '(cancel "O")) "strategy.cancel(\"O\")")))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Coverage: Barcolor Unconditional
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest gen-barcolor-unconditional
+  (let [o (gen/expr->pine '(barcolor :color green))]
+    (is (str/includes? o "barcolor("))
+    (is (str/includes? o "color.green"))))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Coverage: Fill
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest gen-fill
+  (let [o (gen/expr->pine '(fill p1 p2 :color blue :alpha 90))]
+    (is (str/includes? o "fill"))
+    (is (str/includes? o "color.new"))))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Coverage: Defvar, Defvarip, Set!
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest gen-defvar
+  (is (= (gen/expr->pine '(defvar count 0)) "var count = 0"))
+  (is (= (gen/expr->pine '(defvar total 0.0)) "var total = 0.0")))
+
+(deftest gen-defvarip
+  (is (= (gen/expr->pine '(defvarip high-val 0.0)) "varip high_val = 0.0")))
+
+(deftest gen-set!
+  (is (= (gen/expr->pine '(set! count (+ count 1))) "count := count + 1"))
+  (is (= (gen/expr->pine '(set! total (- total 1))) "total := total - 1"))
+  (is (= (gen/expr->pine '(set! running-total (+ running-total close)))
+         "running_total := running_total + close")))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Coverage: If/Else Multi-Branch
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest gen-if-else-simple
+  (let [o (gen/expr->pine '(if (> x 0) (long "E") :else (close)))]
+    (is (str/includes? o "if"))
+    (is (str/includes? o "else"))))
+
+(deftest gen-if-elseif-else
+  (let [o (gen/expr->pine '(if (> x 70) (short) (< x 30) (long) :else (close)))]
+    (is (str/includes? o "if"))
+    (is (str/includes? o "else if"))
+    (is (str/includes? o "else"))))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Coverage: For, While, Switch
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest gen-for-loop
+  (let [o (gen/expr->pine '(for [i (range 1 5)] (set! sum (+ sum (close i)))))]
+    (is (str/includes? o "for"))
+    (is (str/includes? o "="))
+    (is (str/includes? o "to"))))
+
+(deftest gen-while-loop
+  (let [o (gen/expr->pine '(while (< i 10) (set! i (+ i 1))))]
+    (is (str/includes? o "while"))
+    (is (str/includes? o "i :="))))
+
+(deftest gen-switch
+  (let [o (gen/expr->pine '(switch regime 0 (long "TREND") 1 (short "MR") :else (close "X")))]
+    (is (str/includes? o "switch"))
+    (is (str/includes? o "=>"))))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Coverage: Highest, Lowest, Highestbars, Lowestbars
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest gen-highest-lowest
+  (is (= (gen/expr->pine '(highest high 20)) "ta.highest(high, 20)"))
+  (is (= (gen/expr->pine '(highest close 10)) "ta.highest(close, 10)"))
+  (is (= (gen/expr->pine '(lowest low 20)) "ta.lowest(low, 20)"))
+  (is (= (gen/expr->pine '(highestbars high 20)) "ta.highestbars(high, 20)"))
+  (is (= (gen/expr->pine '(lowestbars low 14)) "ta.lowestbars(low, 14)")))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Coverage: Symbol references in indicator period args
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest gen-indicator-with-symbol-period
+  ;; Symbols in period position are converted to snake_case
+  (is (= (gen/expr->pine '(sma close my-period)) "ta.sma(close, my_period)"))
+  (is (= (gen/expr->pine '(highest high my-period)) "ta.highest(high, my_period)")))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Coverage: Math scalar functions
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest gen-math-scalars
+  (is (= (gen/expr->pine '(log close)) "math.log(close)"))
+  (is (= (gen/expr->pine '(exp 2)) "math.exp(2)"))
+  (is (= (gen/expr->pine '(sqrt x)) "math.sqrt(x)"))
+  (is (= (gen/expr->pine '(abs -5)) "math.abs(-5)"))
+  (is (= (gen/expr->pine '(ceil 3.2)) "math.ceil(3.2)"))
+  (is (= (gen/expr->pine '(floor 3.8)) "math.floor(3.8)"))
+  (is (= (gen/expr->pine '(pow 2 3)) "math.pow(2, 3)"))
+  (is (= (gen/expr->pine '(min a b)) "math.min(a, b)"))
+  (is (= (gen/expr->pine '(max a b)) "math.max(a, b)"))
+  (is (= (gen/expr->pine '(sign -5)) "math.sign(-5)")))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Property-Based: Random period tests for additional indicators
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest property-random-wma-periods
+  (doseq [p (take 20 (repeatedly #(+ 2 (rand-int 98))))]
+    (let [o (gen/expr->pine (list 'wma p))]
+      (is (re-find #"^ta\.wma\(close, \d+\)$" o)
+          (str "Failed wma period " p)))))
+
+(deftest property-random-hma-periods
+  (doseq [p (take 20 (repeatedly #(+ 2 (rand-int 98))))]
+    (let [o (gen/expr->pine (list 'hma p))]
+      (is (re-find #"^ta\.hma\(close, \d+\)$" o)
+          (str "Failed hma period " p)))))
+
+(deftest property-random-stdev-periods
+  (doseq [p (take 20 (repeatedly #(+ 2 (rand-int 98))))]
+    (let [o (gen/expr->pine (list 'stdev p))]
+      (is (re-find #"^ta\.stdev\(close, \d+\)$" o)
+          (str "Failed stdev period " p)))))
+
+(deftest property-random-atr-variants
+  (doseq [p (take 20 (repeatedly #(+ 2 (rand-int 98))))]
+    (let [o (gen/expr->pine (list 'atr p))]
+      (is (re-find #"^ta\.atr\(\d+\)$" o)
+          (str "Failed atr period " p)))))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Coverage: emit-file integration with all construct types
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest gen-emit-file-with-defvar-on-bar
+  (let [o (gen/emit-file (reader/parse "
+(strategy \"T\" :default-qty 100)
+(defvar count 0)
+(def fast (sma 50))
+(on-bar
+  (when (> close fast) (long \"E\"))
+  (set! count (+ count 1)))
+(exit \"X\" :from \"E\" :loss 100)
+(plot fast \"F\")"))]
+    (is (str/includes? o "var count"))
+    (is (str/includes? o "strategy.exit"))
+    (is (str/includes? o "count :="))))
+
+;; ═══════════════════════════════════════════════════════════════════
 ;; Main
 ;; ═══════════════════════════════════════════════════════════════════
 
