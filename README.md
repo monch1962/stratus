@@ -21,7 +21,7 @@ brew install borkdude/brew/babashka
 git clone https://github.com/monch1962/stratus
 cd stratus
 make test
-# → 158 tests, 0 failures
+# → 234 tests, 0 failures
 
 # Write your first strategy
 cat > crossover.stratus << 'EOF'
@@ -60,9 +60,10 @@ Open TradingView → Pine Editor → **Ctrl+V** → **Ctrl+S** — your strategy
 
 ## Coverage
 
+**234 tests, 968 assertions, 0 failures** across 11 suites.
+
 ~110 constructs across indicators, conditions, logic, arithmetic, strategy actions,
 plotting, colours, arrays, tables, drawing objects, and built-in values.
-Each is backed by tests — **158 tests, 0 failures**.
 
 ### Examples
 
@@ -94,7 +95,7 @@ stratus/
 │   ├── constructs.clj   DSL construct definitions
 │   ├── importer.clj     Pine Script → Stratus converter
 │   └── simulator.clj    Strategy backtesting engine
-├── test/stratus/        8 test suites, 158 tests
+├── test/stratus/        11 test suites, 234 tests, 968 assertions
 ├── examples/            11 example .stratus strategies
 ├── docs/                Split documentation
 └── .vscode/             VS Code syntax highlighting
