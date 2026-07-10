@@ -884,6 +884,28 @@
   (if (> (count form) 1)
     (str "ta.wad(" (str/join ", " (map expr->pine (rest form))) ")")
     "ta.wad"))
+;; P3: ta.mama
+(defmethod expr->pine :mama [form]
+  (let [{:keys [positional]} (parse-kwargs (drop 1 form))
+        f (first positional)
+        has-src (and f (or (symbol? f) (keyword? f) (list? f)))
+        src (if has-src (resolve-source f) "close")
+        args (if has-src (rest positional) positional)
+        fl (or (some-> (first args) str) "0.5")
+        sl (or (some-> (second args) str) "0.05")]
+    (str "ta.mama(" src ", " fl ", " sl ")")))
+;; P4: ta.cog
+(defmethod expr->pine :cog [form] (indicator-call form "ta.cog" "close"))
+;; P4: ta.vwmacd
+(defmethod expr->pine :vwmacd [form]
+  (let [{:keys [positional]} (parse-kwargs (drop 1 form))
+        f (first positional)
+        has-src (and f (or (symbol? f) (keyword? f) (list? f)))
+        src (if has-src (resolve-source f) "close")
+        args (if has-src (rest positional) positional)]
+    (str "ta.vwmacd(" src ", " (or (some-> (first args) str) "12") ", "
+         (or (some-> (second args) str) "26") ", "
+         (or (when (< 2 (count args)) (some-> (nth args 2) str)) "9") ")")))
 
 ;; ta.crossover / ta.crossunder (raw)
 (defmethod expr->pine :crossover [form]
@@ -898,3 +920,39 @@
                     ['box.set-extend "box.set_extend"] ['box.set-style "box.set_style"]]]
   (defmethod expr->pine sym [form]
     (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; Last missing features — P3 & P4
+;; ═══════════════════════════════════════════════════════════════════
+
+;; math.phi constant
+(defmethod expr->pine :phi [form] "math.phi")
+
+;; request.seed
+(defmethod expr->pine :seed [form] (str "request.seed(" (str/join ", " (map expr->pine (rest form))) ")"))
+
+;; Polygon lifecycle
+(doseq [[sym pine] [['polygon.delete "polygon.delete"]
+                    ['polygon.set-fillcolor "polygon.set_fillcolor"]
+                    ['polygon.set-bordercolor "polygon.set_bordercolor"]
+                    ['polygon.set-borderwidth "polygon.set_borderwidth"]
+                    ['polygon.get-fillcolor "polygon.get_fillcolor"]
+                    ['polygon.get-bordercolor "polygon.get_bordercolor"]
+                    ['polygon.get-borderwidth "polygon.get_borderwidth"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; Matrix type variants (explicit defmethods for SCI compat)
+(defmethod expr->pine :matrix.float  [form] (str "matrix.new<float>("  (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :matrix.int    [form] (str "matrix.new<int>("    (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :matrix.bool   [form] (str "matrix.new<bool>("   (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :matrix.string [form] (str "matrix.new<string>(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :matrix.color  [form] (str "matrix.new<color>("  (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :matrix.line   [form] (str "matrix.new<line>("   (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :matrix.label  [form] (str "matrix.new<label>("  (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :matrix.box    [form] (str "matrix.new<box>("    (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :matrix.table  [form] (str "matrix.new<table>("  (str/join ", " (map expr->pine (rest form))) ")"))
+
+;; ticker.modify
+(defmethod expr->pine :ticker.modify [form]
+  (str "ticker.modify(" (str/join ", " (map expr->pine (rest form))) ")"))

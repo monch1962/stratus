@@ -28,6 +28,7 @@ test:
 	$(BB) -m stratus.p3p4-test
 	$(BB) -m stratus.p1p3-final-test
 	$(BB) -m stratus.p2p3-remaining-test
+	$(BB) -m stratus.last-missing-test
 
 compile:
 	@echo "Compiling examples..."
