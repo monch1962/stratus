@@ -198,7 +198,7 @@
 
 (deftest gen-strategy-header
   (is (= (gen/expr->pine '(strategy "T" :default-qty 100 :pyramiding 1))
-         "strategy(\"T\", default-qty=100, pyramiding=1)")))
+         "strategy(\"T\", default_qty=100, pyramiding=1)")))
 
 (deftest gen-strategy-header-minimal
   (is (= (gen/expr->pine '(strategy "T"))
