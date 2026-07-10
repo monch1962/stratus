@@ -133,8 +133,8 @@
 (deftest gann-swing-period-input-params
   "The input parameter must have correct def, min, max"
   (let [o (compile-gann 2)]
-    (is (str/includes? o "min=1"))
-    (is (str/includes? o "max=10"))
+    (is (str/includes? o "minval=1"))
+    (is (str/includes? o "maxval=10"))
     ;; Default is emitted as positional arg before the title
     (is (re-find #"input\.int\(2," o))))
 

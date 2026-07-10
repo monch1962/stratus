@@ -9,9 +9,32 @@
    - :pine-fn    — Pine Script function name or generator fn name
    - :doc        — human-readable description")
 
+;; ─── Inputs ──────────────────────────────────────────────────────────
+(def input-constructs
+  [{:name :input-int, :category :input,
+    :doc "Integer input parameter with optional range"}
+   {:name :input-float, :category :input,
+    :doc "Float input parameter with optional range"}
+   {:name :input-bool, :category :input,
+    :doc "Boolean (checkbox) input parameter"}
+   {:name :input-string, :category :input,
+    :doc "Text string input parameter"}
+   {:name :input-color, :category :input,
+    :doc "Color picker input parameter"}
+   {:name :input-source, :category :input,
+    :doc "Source (ohlc4/hl2/etc.) input parameter"}
+   {:name :input-symbol, :category :input,
+    :doc "Ticker symbol input parameter"}
+   {:name :input-timeframe, :category :input,
+    :doc "Timeframe resolution input parameter"}
+   {:name :input-price, :category :input,
+    :doc "Price input with crosshair picker"}
+   {:name :input-session, :category :input,
+    :doc "Trading session time range input"}])
+
 (def constructs
   "All supported DSL constructs in priority order."
-  [
+  (into [
    ;; ─── Declarations ─────────────────────────────────────────────────
    {:name :strategy, :category :decl, :arity :block,
     :doc "Define a trading strategy with name and parameters"}
@@ -143,7 +166,8 @@
 
    ;; ─── Alerts ───────────────────────────────────────────────────────
    {:name :alertcondition, :category :alert, :arity :fixed,
-    :pine-fn "alertcondition", :doc "Define an alert condition"}])
+    :pine-fn "alertcondition", :doc "Define an alert condition"}]
+   input-constructs))
 
 ;; ─── Lookup ──────────────────────────────────────────────────────────
 

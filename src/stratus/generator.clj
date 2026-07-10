@@ -93,9 +93,13 @@
 (defn emit-kwargs [kwargs]
   (when (seq kwargs)
     (str ", " (str/join ", "
-      (map (fn [e] (let [k (name (key e))
+      (map (fn [e] (let [raw-name (name (key e))
+                         pine-name (case raw-name
+                                    "min" "minval"
+                                    "max" "maxval"
+                                    raw-name)
                          v (val->pine (val e))]
-                     (str (clojure.string/replace k #"-" "_") "=" v)))
+                     (str (clojure.string/replace pine-name #"-" "_") "=" v)))
            kwargs)))))
 
 (defn plot-call [pine-fn form]
@@ -469,6 +473,8 @@
 (defmethod expr->pine :input-source  [form] (input-call form "source"))
 (defmethod expr->pine :input-symbol  [form] (input-call form "symbol"))
 (defmethod expr->pine :input-timeframe [form] (input-call form "timeframe"))
+(defmethod expr->pine :input-price    [form] (input-call form "price"))
+(defmethod expr->pine :input-session  [form] (input-call form "session"))
 
 ;; ─── P4: Drawing objects ───────────────────────────────────────────
 (defmethod expr->pine :line.new [form]
