@@ -4,6 +4,7 @@
             [stratus.constructs :as constructs]
             [stratus.importer :as imp]
             [stratus.simulator :as sim]
+            [stratus.exporter :as exp]
             [clojure.string :as str])
   (:gen-class))
 
@@ -134,6 +135,11 @@
   (println "Usage:")
   (println "  compile <file.stratus>  [-o <file.pine>]  Compile to Pine Script")
   (println "                          [-c|--clip]       Copy to clipboard")
+  (println "  export  <symbol>            [--market <m>]     Export OHLCV to CSV")
+  (println "                          [--interval <i>]      (default: D)")
+  (println "                          [--format <fmt>]      csv or json (default: csv)")
+  (println "                          [-o <file>]           Output file")
+  (println "                          [--dry-run]           Print to stdout")
   (println "  import  <file.pine>     [-o <file.stratus>]  Convert Pine to Stratus")
   (println "  simulate <file.stratus> [--bars N]        Simulate strategy")
   (println "  watch   <file.stratus>  [-o <file.pine>]  Watch for changes")
@@ -147,6 +153,7 @@
   (println "  ./stratus import my-strategy.pine -o my.stratus    Convert existing")
   (println "  ./stratus compile my.stratus --clip               Compile to clipboard")
   (println "  ./stratus simulate my.stratus                     Backtest strategy")
+  (println "  ./stratus export AAPL --interval W --format csv   Export weekly data")
   (println "  ./stratus new strategy \"Breakout\"                 New from scratch"))
 
 (defn compile-strategy
@@ -246,6 +253,34 @@
     (println (str "│  Net P&L:      " (format "%.2f" (double (:net-profit result))) (apply str (repeat (- 35 (count (format "%.2f" (double (:net-profit result))))) " ")) "│"))
     (println "└──────────────────────────────────────┘")))
 
+;; ─── Export ────────────────────────────────────────────────────────
+
+(defn export-data
+  "Export OHLCV data for a symbol from TradingView."
+  [symbol args]
+  (let [args-vec (vec args)
+        mkt-idx  (some #(let [i (.indexOf args-vec %)] (when (>= i 0) i)) ["--market"])
+        int-idx  (some #(let [i (.indexOf args-vec %)] (when (>= i 0) i)) ["--interval"])
+        fmt-idx  (some #(let [i (.indexOf args-vec %)] (when (>= i 0) i)) ["--format"])
+        out-idx  (some #(let [i (.indexOf args-vec %)] (when (>= i 0) i)) ["-o" "--output"])
+        dry-run? (some #{"--dry-run"} args-vec)
+        market   (if (and mkt-idx (< (inc mkt-idx) (count args-vec))) (nth args-vec (inc mkt-idx)))
+        interval (if (and int-idx (< (inc int-idx) (count args-vec))) (nth args-vec (inc int-idx)))
+        format   (or (and fmt-idx (< (inc fmt-idx) (count args-vec)) (nth args-vec (inc fmt-idx))) "csv")
+        out-path (when (and out-idx (< (inc out-idx) (count args-vec))) (nth args-vec (inc out-idx)))
+        url      (exp/build-url symbol
+                   :market (or market "america")
+                   :interval (or interval "D"))
+        bars     (exp/fetch-ohlcv url)]
+    (if bars
+      (let [output ((if (= format "json") exp/format-json exp/format-csv) bars)]
+        (if (or dry-run? (nil? out-path))
+          (println output)
+          (do (spit out-path output)
+              (println "✓ Exported" (count bars) "bars for" symbol "→" out-path))))
+      (println "✕ No data returned for" symbol
+               "\n  Check the symbol and market. Try: --market crypto --exchange BINANCE"))))
+
 (defn -main
   [& args]
   (let [cmd (first args)
@@ -255,6 +290,11 @@
                   (if in-path
                     (compile-strategy in-path (vec rest-args))
                     (println "Usage: bb -m stratus.core compile <file.stratus> [-o file.pine] [-c]")))
+
+      "export" (let [sym (first rest-args)]
+                 (if sym
+                   (export-data sym (rest rest-args))
+                   (println "Usage: bb -m stratus.core export <symbol> [--market m] [--interval i] [--format csv|json] [-o file] [--dry-run]")))
 
       "watch" (let [in-path (first rest-args)]
                 (if in-path

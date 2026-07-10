@@ -7,6 +7,7 @@
 ./stratus compile <file.stratus> [-o|--output <file.pine>]  Compile to Pine Script
                           [-c|--clip]                       Copy to clipboard
 ./stratus import  <file.pine>      [-o <file.stratus>]      Convert Pine to Stratus
+./stratus export  <symbol>          [--market <m>]           Export OHLCV to CSV/JSON
 ./stratus simulate <file.stratus>  [--bars N]                Backtest strategy
 ./stratus watch   <file.stratus>   [-o <file.pine>]         Watch for changes
                           [-c|--clip]                       Auto-copy on save
@@ -53,6 +54,35 @@ headers, variable assignments, indicators (sma, ema, rsi, macd, bb, etc.),
 strategy actions (entry, close, exit, order), plotting (plot, hline, bgcolor),
 conditions (crosses-above/below, rising/falling), and colors.
 Anything it cannot translate is flagged with a `; WARN` comment.
+
+## Export
+
+Fetches OHLCV data for a symbol from TradingView's chart history API and
+outputs it as CSV or JSON. No API key or authentication is required.
+
+```bash
+# Export daily AAPL data as CSV (to terminal)
+./stratus export AAPL
+
+# Export as JSON, save to file
+./stratus export AAPL --format json -o aapl.json
+
+# Custom market and interval
+./stratus export BTCUSD --market crypto --interval 60 -o btc-1h.csv
+
+# Dry-run (print to stdout)
+./stratus export AAPL --dry-run
+```
+
+**Options:**
+- `--market <m>` — market segment: `america` (default), `crypto`, `forex`, `india`
+- `--interval <i>` — bar resolution: `D` (default), `1`, `5`, `15`, `60`, `W`, `M`
+- `--format <fmt>` — output format: `csv` (default) or `json`
+- `-o <file>` — write to file instead of stdout
+- `--dry-run` — print to stdout regardless of other flags
+
+The exporter uses TradingView's internal chart history endpoint. It fetches
+the last 90 days by default. No authentication is needed for public data.
 
 ## Simulate
 
