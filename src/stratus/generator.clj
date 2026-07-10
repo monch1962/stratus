@@ -19,6 +19,26 @@
   {:bar-confirmed "barstate.isconfirmed", :bar-first "barstate.isfirst",
    :bar-last "barstate.islast"})
 
+(def syminfo-builtins
+  {:mintick "syminfo.mintick", :pointvalue "syminfo.pointvalue",
+   :sym-session "syminfo.session", :sym-description "syminfo.description",
+   :sym-type "syminfo.type"})
+
+(def math-scalars
+  [:log :log10 :exp :sqrt :abs :ceil :floor :round :pow :min :max :sign])
+
+(def strategy-builtins-map
+  {:position-size "strategy.position_size", :position-avg-price "strategy.position_avg_price",
+   :open-trades "strategy.opentrades", :equity "strategy.equity",
+   :net-profit "strategy.netprofit",
+   :allow-entry-in "strategy.risk.allow_entry_in",
+   :max-intraday-orders "strategy.risk.max_intraday_filled_orders"})
+
+(def fundamental-requests
+  {:dividends "request.dividends(syminfo.tickerid)",
+   :splits "request.splits(syminfo.tickerid)",
+   :earnings "request.earnings(syminfo.tickerid)"})
+
 (def strategy-builtins
   {:position-size "strategy.position_size", :position-avg-price "strategy.position_avg_price",
    :open-trades "strategy.opentrades", :equity "strategy.equity",
@@ -99,11 +119,14 @@
     (if (list? form)
       (let [k (keyword (first form))
             price-syms #{:close :high :low :open :volume :hl2 :hlc3 :ohlc4}
-            strat-syms #{:position-size :position-avg-price :open-trades :equity :net-profit}]
+            strat-syms (set (keys strategy-builtins-map))
+            fund-syms (set (keys fundamental-requests))]
         (cond (and (price-syms k) (not (string? (second form)))) ::price-ref
               (strat-syms k) ::strat-builtin
               (time-builtins k) ::time-ref
               (barstate-builtins k) ::barstate-ref
+              (syminfo-builtins k) ::syminfo-ref
+              (fund-syms k) ::fundamental
               :else k))
       ::literal)))
 
@@ -111,7 +134,11 @@
   (str (name (first form)) (when (number? (second form)) (str "[" (second form) "]"))))
 
 (defmethod expr->pine ::strat-builtin [form]
-  (strategy-builtins (keyword (first form))))
+  (let [k (keyword (first form))
+        v (get strategy-builtins-map k)]
+    (if (and v (seq (rest form)))
+      (str v "(" (val->pine (second form)) ")")
+      v)))
 
 (defmethod expr->pine ::time-ref [form]
   (time-builtins (keyword (first form))))
@@ -119,14 +146,22 @@
 (defmethod expr->pine ::barstate-ref [form]
   (barstate-builtins (keyword (first form))))
 
+(defmethod expr->pine ::syminfo-ref [form]
+  (syminfo-builtins (keyword (first form))))
+
+(defmethod expr->pine ::fundamental [form]
+  (fundamental-requests (keyword (first form))))
+
 (defmethod expr->pine ::literal [form]
   (cond (string? form) (str "\"" form "\"")
         (number? form) (str form)
         (keyword? form) (name form)
         (symbol? form) (or (builtin-sources (keyword (name form)))
-                           (strategy-builtins (keyword (name form)))
+                           (get strategy-builtins-map (keyword (name form)))
                            (time-builtins (keyword (name form)))
                            (barstate-builtins (keyword (name form)))
+                           (syminfo-builtins (keyword (name form)))
+                           (fundamental-requests (keyword (name form)))
                            (str/replace (name form) #"-" "_"))
         (list? form) (expr->pine form)
         (true? form) "true" (false? form) "false" (nil? form) "na"
@@ -411,6 +446,86 @@
 
 ;; ─── On-Bar Block (extended with if/else support) ──────────────────
 
+;; ─── P3: Math scalars ──────────────────────────────────────────────
+(doseq [s [:log :log10 :exp :sqrt :abs :ceil :floor :round :sign]]
+  (defmethod expr->pine s [form]
+    (str "math." (name s) "(" (expr->pine (second form)) ")")))
+(defmethod expr->pine :pow [form]
+  (str "math.pow(" (expr->pine (nth form 1)) ", " (expr->pine (nth form 2)) ")"))
+(defmethod expr->pine :min [form]
+  (str "math.min(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :max [form]
+  (str "math.max(" (str/join ", " (map expr->pine (rest form))) ")"))
+
+;; ─── P4: Input parameters ──────────────────────────────────────────
+(defn input-call [form pine-type]
+  (let [name-arg (second form)
+        {:keys [keyword]} (parse-kwargs (drop 2 form))
+        default (:def keyword)
+        def-str (when default
+                  (if (= pine-type "source")
+                    (str (expr->pine default) ", ")
+                    (str (val->pine default) ", ")))
+        rest-str (emit-kwargs (dissoc keyword :def))]
+    (str "input." pine-type "(" def-str "\"" name-arg "\"" rest-str ")")))
+
+(defmethod expr->pine :input-int     [form] (input-call form "int"))
+(defmethod expr->pine :input-float   [form] (input-call form "float"))
+(defmethod expr->pine :input-bool    [form] (input-call form "bool"))
+(defmethod expr->pine :input-string  [form] (input-call form "string"))
+(defmethod expr->pine :input-color   [form] (input-call form "color"))
+(defmethod expr->pine :input-source  [form] (input-call form "source"))
+(defmethod expr->pine :input-symbol  [form] (input-call form "symbol"))
+(defmethod expr->pine :input-timeframe [form] (input-call form "timeframe"))
+
+;; ─── P4: Drawing objects ───────────────────────────────────────────
+(defmethod expr->pine :line.new [form]
+  (let [{:keys [positional keyword]} (parse-kwargs (drop 1 form))]
+    (str "line.new(" (str/join ", " (map expr->pine positional)) (emit-kwargs keyword) ")")))
+(defmethod expr->pine :line.delete [form]
+  (str "line.delete(" (expr->pine (second form)) ")"))
+(defmethod expr->pine :label.new [form]
+  (let [{:keys [positional keyword]} (parse-kwargs (drop 1 form))]
+    (str "label.new(" (str/join ", " (map expr->pine positional)) (emit-kwargs keyword) ")")))
+(defmethod expr->pine :box.new [form]
+  (let [{:keys [positional keyword]} (parse-kwargs (drop 1 form))]
+    (str "box.new(" (str/join ", " (map expr->pine positional)) (emit-kwargs keyword) ")")))
+
+;; ─── P4: color.rgb / from-gradient / tostring ──────────────────────
+(defmethod expr->pine :rgb [form]
+  (str "color.rgb(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :from-gradient [form]
+  (str "color.from_gradient(" (expr->pine (nth form 1)) ", " (expr->pine (nth form 2))
+       ", " (expr->pine (nth form 3)) ", " (val->pine (nth form 4))
+       ", " (val->pine (nth form 5)) ")"))
+(defmethod expr->pine :tostring [form]
+  (str "str.tostring(" (str/join ", " (map expr->pine (rest form))) ")"))
+
+;; ─── P4: library export ────────────────────────────────────────────
+(defmethod expr->pine :export [form]
+  (str "export " (str/replace (name (second form)) #"-" "_")))
+
+;; ─── P5: Array methods ─────────────────────────────────────────────
+(defmethod expr->pine :array-int   [form] (str "array.new_int(" (or (some-> (second form) str) "10") ")"))
+(defmethod expr->pine :array-float [form]
+  (str "array.new_float(" (or (some-> (second form) str) "10")
+       (when (nth form 2) (str ", " (val->pine (nth form 2)))) ")"))
+(defmethod expr->pine :push  [form] (str "array.push(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :pop   [form] (str "array.pop(" (expr->pine (second form)) ")"))
+(defmethod expr->pine :size  [form] (str "array.size(" (expr->pine (second form)) ")"))
+(defmethod expr->pine :get   [form]
+  (str "array.get(" (expr->pine (second form)) ", " (expr->pine (nth form 2)) ")"))
+(defmethod expr->pine :set   [form]
+  (str "array.set(" (expr->pine (second form)) ", " (expr->pine (nth form 2)) ", " (expr->pine (nth form 3)) ")"))
+(defmethod expr->pine :sort  [form] (str "array.sort(" (expr->pine (second form)) ")"))
+
+;; ─── P5: Table basics ──────────────────────────────────────────────
+(defmethod expr->pine :table.new [form]
+  (let [{:keys [keyword]} (parse-kwargs (drop 1 form))]
+    (str "table.new(" (emit-kwargs keyword) ")")))
+(defmethod expr->pine :table-cell [form]
+  (str "table.cell(" (str/join ", " (map expr->pine (rest form))) ")"))
+
 ;; ─── P2: library() header ──────────────────────────────────────────
 (defmethod expr->pine :library [form]
   (let [{:keys [keyword]} (parse-kwargs (drop 2 form))]
@@ -493,6 +608,8 @@
          (when (seq secs)    (str (str/join "\n" (map expr->pine secs)) "\n"))
          ;; Set! assignments (inside on-bar before logic)
          (when (seq sets)    (str (str/join "\n" (map expr->pine sets)) "\n"))
+         (when-let [exports (seq (by-type :export))]
+         (str (str/join "\n" (map expr->pine exports)) "\n"))
          ;; On-bar logic
          (when-let [o (first (by-type :on-bar))] (str (expr->pine o) "\n"))
          ;; Exits
