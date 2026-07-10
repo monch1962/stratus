@@ -10,6 +10,15 @@
   {:close "close", :high "high", :low "low", :open "open",
    :volume "volume", :hl2 "hl2", :hlc3 "hlc3", :ohlc4 "ohlc4"})
 
+(def time-builtins
+  {:time "time", :dayofweek "dayofweek", :month "month",
+   :hour "hour", :bar-index "bar_index", :ticker "syminfo.tickerid",
+   :timeframe "timeframe.period"})
+
+(def barstate-builtins
+  {:bar-confirmed "barstate.isconfirmed", :bar-first "barstate.isfirst",
+   :bar-last "barstate.islast"})
+
 (def strategy-builtins
   {:position-size "strategy.position_size", :position-avg-price "strategy.position_avg_price",
    :open-trades "strategy.opentrades", :equity "strategy.equity",
@@ -93,6 +102,8 @@
             strat-syms #{:position-size :position-avg-price :open-trades :equity :net-profit}]
         (cond (and (price-syms k) (not (string? (second form)))) ::price-ref
               (strat-syms k) ::strat-builtin
+              (time-builtins k) ::time-ref
+              (barstate-builtins k) ::barstate-ref
               :else k))
       ::literal)))
 
@@ -102,16 +113,29 @@
 (defmethod expr->pine ::strat-builtin [form]
   (strategy-builtins (keyword (first form))))
 
+(defmethod expr->pine ::time-ref [form]
+  (time-builtins (keyword (first form))))
+
+(defmethod expr->pine ::barstate-ref [form]
+  (barstate-builtins (keyword (first form))))
+
 (defmethod expr->pine ::literal [form]
   (cond (string? form) (str "\"" form "\"")
         (number? form) (str form)
         (keyword? form) (name form)
         (symbol? form) (or (builtin-sources (keyword (name form)))
                            (strategy-builtins (keyword (name form)))
+                           (time-builtins (keyword (name form)))
+                           (barstate-builtins (keyword (name form)))
                            (str/replace (name form) #"-" "_"))
         (list? form) (expr->pine form)
         (true? form) "true" (false? form) "false" (nil? form) "na"
         :otherwise (str form)))
+
+(defmethod expr->pine :default [form]
+  (let [fn-name (name (first form))
+        args (rest form)]
+    (str (str/replace fn-name #"-" "_") "(" (str/join ", " (map expr->pine args)) ")")))
 
 ;; ─── Strategy / Indicator / Library Headers ─────────────────────────
 
@@ -205,6 +229,42 @@
   (let [s (resolve-source (second form))
         p (or (some-> (nth form 2) str) "20")]
     (str "ta.lowest(" s ", " p ")")))
+
+;; P1: cum / highestbars / lowestbars / sum / avg / fixnan / valuewhen
+(defmethod expr->pine :cum       [form] (str "math.cum(" (expr->pine (second form)) ")"))
+(defmethod expr->pine :highestbars [form]
+  (str "ta.highestbars(" (expr->pine (second form)) ", " (or (some-> (nth form 2) str) "20") ")"))
+(defmethod expr->pine :lowestbars [form]
+  (str "ta.lowestbars(" (expr->pine (second form)) ", " (or (some-> (nth form 2) str) "20") ")"))
+(defmethod expr->pine :sum  [form] (str "math.sum(" (expr->pine (second form)) ", " (or (some-> (nth form 2) str) "20") ")"))
+(defmethod expr->pine :avg  [form] (str "math.avg(" (expr->pine (second form)) ", " (or (some-> (nth form 2) str) "20") ")"))
+(defmethod expr->pine :fixnan [form] (str "fixnan(" (expr->pine (second form)) ")"))
+(defmethod expr->pine :valuewhen [form]
+  (str "ta.valuewhen(" (expr->pine (nth form 1)) ", " (expr->pine (nth form 2)) ")"))
+
+;; P1: strategy.order / cancel
+(defmethod expr->pine :order [form]
+  (let [label (second form)
+        dir (nth form 2)
+        {:keys [keyword]} (parse-kwargs (drop 3 form))
+        dir-str (case dir :long "strategy.long" :short "strategy.short" (name dir))]
+    (str "strategy.order(\"" label "\", " dir-str (emit-kwargs keyword) ")")))
+(defmethod expr->pine :cancel [form]
+  (str "strategy.cancel(\"" (second form) "\")"))
+
+;; P2: statistics
+(defmethod expr->pine :correlation [form]
+  (str "ta.correlation(" (expr->pine (nth form 1)) ", " (expr->pine (nth form 2)) ", " (or (some-> (nth form 3) str) "20") ")"))
+(defmethod expr->pine :covariance [form]
+  (str "ta.covariance(" (expr->pine (nth form 1)) ", " (expr->pine (nth form 2)) ", " (or (some-> (nth form 3) str) "20") ")"))
+(defmethod expr->pine :median [form] (str "ta.median(" (expr->pine (second form)) ", " (or (some-> (nth form 2) str) "20") ")"))
+(defmethod expr->pine :mode   [form] (str "ta.mode(" (expr->pine (second form)) ", " (or (some-> (nth form 2) str) "20") ")"))
+(defmethod expr->pine :percentile [form]
+  (str "ta.percentile_nearest_rank(" (expr->pine (second form)) ", " (or (some-> (nth form 2) str) "20") ", " (or (some-> (nth form 3) str) "50") ")"))
+
+;; P2: in-session
+(defmethod expr->pine :in-session [form]
+  (str "session.isregular(" (val->pine (second form)) ")"))
 
 ;; ─── Conditions ─────────────────────────────────────────────────────
 
@@ -351,6 +411,47 @@
 
 ;; ─── On-Bar Block (extended with if/else support) ──────────────────
 
+;; ─── P2: library() header ──────────────────────────────────────────
+(defmethod expr->pine :library [form]
+  (let [{:keys [keyword]} (parse-kwargs (drop 2 form))]
+    (str "//@version=6\nlibrary(\"" (second form) "\"" (emit-kwargs keyword) ")")))
+
+;; ─── P2: User-defined functions (defn) ─────────────────────────────
+(defmethod expr->pine :defn [form]
+  (let [[_ fname args & body] form
+        name-str (str/replace (name fname) #"-" "_")
+        arg-str (str/join ", " (map clojure.core/name args))]
+    (str name-str "(" arg-str ") =>\n    " (str/join "\n    " (map expr->pine body)))))
+
+;; ─── P2: for loop ──────────────────────────────────────────────────
+(defmethod expr->pine :for [form]
+  (let [[_ [i [_ start end]] & body] form]
+    (str "for " (name i) " = " start " to " end "\n"
+         (str/join "\n" (map #(str "    " (expr->pine %)) body)))))
+
+;; ─── P2: while loop ────────────────────────────────────────────────
+(defmethod expr->pine :while [form]
+  (let [[_ cond & body] form]
+    (str "while " (expr->pine cond) "\n"
+         (str/join "\n" (map #(str "    " (expr->pine %)) body)))))
+
+;; ─── P2: switch statement ──────────────────────────────────────────
+(defmethod expr->pine :switch [form]
+  (let [[_ switch-expr & cases] form
+        expr-str (expr->pine switch-expr)]
+    (loop [rem cases, lines [], idx 0]
+      (if (empty? rem)
+        (str/join "\n" lines)
+        (let [val (first rem) action (second rem)]
+          (if (= val :else)
+            (let [line (str "    =>\n        " (expr->pine action))]
+              (recur (drop 2 rem) (conj lines line) (inc idx)))
+            (let [keyword (if (zero? idx) (str "switch " expr-str) "")
+                  line (str keyword "\n    " (expr->pine val) " =>\n        " (expr->pine action))]
+              (recur (drop 2 rem) (conj lines line) (inc idx)))))))))
+
+;; ─── On-Bar Block ──────────────────────────────────────────────────
+
 (defmethod expr->pine :on-bar [form]
   (str/join "\n\n"
     (map (fn [frm]
@@ -370,6 +471,7 @@
 (defn emit-file [forms]
   (let [by-type  (fn [kw] (filter #(kw-first % kw) forms))
         defs     (by-type :def)
+        defns    (by-type :defn)
         defvars  (by-type :defvar)
         defvips  (by-type :defvarip)
         sets     (by-type :set!)
@@ -381,9 +483,11 @@
         ["//@version=6" ""
          (when-let [s (first (by-type :strategy))]  (str (expr->pine s) "\n"))
          (when-let [s (first (by-type :indicator))] (str (expr->pine s) "\n"))
-         ;; Variable bindings: defvars, then defs, then multiset
+         (when-let [s (first (by-type :library))] (str (expr->pine s) "\n"))
+         ;; Variable bindings: defvars, then defs, then defns, then multiset
          (when (seq defvars) (str (str/join "\n" (map expr->pine defvars)) "\n"))
          (when (seq defvips) (str (str/join "\n" (map expr->pine defvips)) "\n"))
+         (when (seq defns)   (str (str/join "\n\n" (map expr->pine defns)) "\n"))
          (when (seq defs)    (str (str/join "\n" (map expr->pine defs)) "\n"))
          (when (seq multis)  (str (str/join "\n" (map expr->pine multis)) "\n"))
          (when (seq secs)    (str (str/join "\n" (map expr->pine secs)) "\n"))
