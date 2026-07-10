@@ -398,9 +398,9 @@
 
 (deftest gen-strategy-exit
   (is (= (gen/expr->pine '(exit "X" :from "E" :loss 100 :profit 200))
-         "strategy.exit(\"X\", from=\"E\", loss=100, profit=200)"))
+         "strategy.exit(\"X\", from_entry=\"E\", loss=100, profit=200)"))
   (is (= (gen/expr->pine '(exit "T" :from "E" :trail 50 :trail-offset 10))
-         "strategy.exit(\"T\", from=\"E\", trail_points=50, trail_offset=10)")))
+         "strategy.exit(\"T\", from_entry=\"E\", trail_points=50, trail_offset=10)")))
 
 (deftest gen-strategy-order
   ;; Order uses :direction + keyword args; qty is not extracted from positional
