@@ -54,6 +54,51 @@
     (is (str/includes? out "clip"))
     (is (str/includes? out "watch"))))
 
+(deftest scaffold-creates-file
+  (core/-main "new" "strategy")
+  (let [f (java.io.File. "my-strategy.stratus")]
+    (is (.exists f))
+    (.delete f)))
+
+(deftest scaffold-with-name
+  (core/-main "new" "indicator" "MyRSI")
+  (let [f (java.io.File. "MyRSI.stratus")]
+    (is (.exists f))
+    (is (str/includes? (slurp "MyRSI.stratus") "indicator"))
+    (.delete f)))
+
+(deftest scaffold-library-works
+  (core/-main "new" "library" "Utils")
+  (let [f (java.io.File. "Utils.stratus")]
+    (is (.exists f))
+    (is (str/includes? (slurp "Utils.stratus") "library"))
+    (.delete f)))
+
+(deftest scaffold-default-uses-type-name
+  (core/-main "new" "strategy" "Breakout")
+  (let [f (java.io.File. "Breakout.stratus")]
+    (is (.exists f))
+    (is (str/includes? (slurp "Breakout.stratus") "strategy"))
+    (.delete f)))
+
+(deftest usage-shows-scaffold
+  (let [out (with-out-str (core/-main))]
+    (is (str/includes? out "new"))))
+
+(deftest safe-compile-missing-file
+  (let [out (with-out-str (core/-main "compile" "/tmp/_nonexistent.stratus"))]
+    (is (str/includes? out "File not found"))))
+
+(deftest safe-compile-bad-syntax
+  (spit "/tmp/_bad.stratus" "(strategy \"Bad\"\n(def x (sma 14)\n")  ;; missing )
+  (let [out (with-out-str (core/-main "compile" "/tmp/_bad.stratus"))]
+    (is (or (str/includes? out "Unmatched")
+            (str/includes? (str/lower-case out) "error")))))
+
+(deftest new-shows-usage-on-no-type
+  (let [out (with-out-str (core/-main "new"))]
+    (is (str/includes? out "Usage"))))
+
 ;; ═══════════════════════════════════════════════════════════════════
 ;; Main
 ;; ═══════════════════════════════════════════════════════════════════
