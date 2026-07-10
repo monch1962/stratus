@@ -102,7 +102,7 @@
 
 ;; ─── Expression evaluator ──────────────────────────────────────────
 
-(declare eval-expr)
+(declare eval-expr get-series)
 
 (defn eval-fn
   "Evaluate a DSL function call against current state."
@@ -146,8 +146,12 @@
                 (when (>= (count(:close (:bars state))) n)
                   (> (nth (:close (:bars state)) (- (count (:close (:bars state))) 2 n))
                      (last (:close (:bars state))))))
-      crosses-above (crosses-above (nth eval-args 0) (nth eval-args 1))
-      crosses-below (crosses-below (nth eval-args 0) (nth eval-args 1))
+      crosses-above (let [a (get-series state (nth args 0))
+                          b (get-series state (nth args 1))]
+                      (crosses-above a b))
+      crosses-below (let [a (get-series state (nth args 0))
+                          b (get-series state (nth args 1))]
+                      (crosses-below a b))
       highest (let [src (current-value state (first (rest form)))
                     n (int (or (second eval-args) 20))]
                 (highest (:close (:bars state)) n))
@@ -163,7 +167,8 @@
     (nil? expr) nil
     (number? expr) expr
     (list? expr) (eval-fn state expr)
-    (symbol? expr) (or (get (:vars state) expr)
+    (symbol? expr) (or (let [v (get (:vars state) expr)]
+                          (if (vector? v) (last v) v))
                        (current-value state expr)
                        (case expr
                          close (current-value state :close)
@@ -175,11 +180,24 @@
     :else expr))
 
 (defn eval-def
-  "Evaluate a (def name expr) form and store in vars."
+  "Evaluate a (def name expr) form, appending the result to a series history."
   [state form]
   (let [[_ name expr] form
         value (eval-expr state expr)]
-    (assoc-in state [:vars name] value)))
+    (update-in state [:vars name] (fnil conj []) value)))
+
+(defn get-series
+  "Get the full computed series for a variable, or the raw bar series."
+  [state sym]
+  (if (contains? (:vars state) sym)
+    (get (:vars state) sym)
+    (case sym
+      close (:close (:bars state))
+      high   (:high (:bars state))
+      low    (:low (:bars state))
+      open   (:open (:bars state))
+      volume (:volume (:bars state))
+      nil)))
 
 (defn eval-when
   "Evaluate a (when cond action) form."
