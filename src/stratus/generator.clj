@@ -66,8 +66,15 @@
 
 (def plot-style-map
   {:line "plot.style_line", :histogram "plot.style_histogram", :area "plot.style_area",
-   :columns "plot.style_columns", :circles "plot.style_circles", :cross "plot.style_cross",
-   :step-line "plot.style_stepline", :step-line-diamond "plot.style_stepline_diamond"})
+  :columns "plot.style_columns", :circles "plot.style_circles", :cross "plot.style_cross",
+  :step-line "plot.style_stepline", :step-line-diamond "plot.style_stepline_diamond"})
+
+  (def table-position-map
+  {:top "table.position_top", :top-right "table.position_top_right",
+  :middle-left "table.position_middle_left", :top-left "table.position_top_left",
+  :top-center "table.position_top_center", :middle-right "table.position_middle_right",
+  :bottom-left "table.position_bottom_left", :bottom-center "table.position_bottom_center",
+  :bottom-right "table.position_bottom_right", :middle-center "table.position_middle_center"})
 
 (def lookup-tables
   (merge {:red "color.red", :green "color.green", :blue "color.blue",
@@ -78,7 +85,8 @@
          {:triangle-up "shape.triangleup", :triangle-down "shape.triangledown"}
          {:top "location.top", :bottom "location.bottom", :absolute "location.absolute"}
          {:solid "hline.style_solid", :dashed "hline.style_dashed", :dotted "hline.style_dotted"}
-         plot-style-map))
+         plot-style-map
+         table-position-map))
 
 (defn val->pine [v]
   (cond (or (keyword? v) (symbol? v))
@@ -152,7 +160,8 @@
   (cond (string? form) (str "\"" form "\"")
         (number? form) (str form)
         (keyword? form) (name form)
-        (symbol? form) (or (builtin-sources (keyword (name form)))
+        (symbol? form) (or (lookup-tables (keyword (str/replace (name form) #"\." "-")))
+                           (builtin-sources (keyword (name form)))
                            (get strategy-builtins-map (keyword (name form)))
                            (time-builtins (keyword (name form)))
                            (barstate-builtins (keyword (name form)))
@@ -548,11 +557,28 @@
 (defmethod expr->pine :export [form]
   (str "export " (str/replace (name (second form)) #"-" "_")))
 
-;; ─── P5: Array methods ─────────────────────────────────────────────
+;; P5: Array methods ─────────────────────────────────────────────
 (defmethod expr->pine :array-int   [form] (str "array.new_int(" (or (some-> (second form) str) "10") ")"))
 (defmethod expr->pine :array-float [form]
   (str "array.new_float(" (or (some-> (second form) str) "10")
        (if (> (count form) 2) (str ", " (val->pine (nth form 2))) "") ")"))
+(defmethod expr->pine :array-bool   [form] (str "array.new_bool(" (or (some-> (second form) str) "10") ")"))
+(defmethod expr->pine :array-string [form] (str "array.new_string(" (or (some-> (second form) str) "10") ")"))
+(defmethod expr->pine :array-color  [form] (str "array.new_color(" (or (some-> (second form) str) "10") ")"))
+(defmethod expr->pine :array-line   [form] (str "array.new_line(" (or (some-> (second form) str) "10") ")"))
+(defmethod expr->pine :array-label  [form] (str "array.new_label(" (or (some-> (second form) str) "10") ")"))
+(defmethod expr->pine :array-box    [form] (str "array.new_box(" (or (some-> (second form) str) "10") ")"))
+(defmethod expr->pine :array-table  [form] (str "array.new_table(" (or (some-> (second form) str) "10") ")"))
+(defmethod expr->pine :array.push      [form] (str "array.push(" (str/join ", " (map expr->pine (rest form))) ")"))
+(defmethod expr->pine :array.pop       [form] (str "array.pop(" (expr->pine (second form)) ")"))
+(defmethod expr->pine :array.size      [form] (str "array.size(" (expr->pine (second form)) ")"))
+(defmethod expr->pine :array.get       [form]
+  (str "array.get(" (expr->pine (second form)) ", " (expr->pine (nth form 2)) ")"))
+(defmethod expr->pine :array.set       [form]
+  (str "array.set(" (expr->pine (second form)) ", " (expr->pine (nth form 2)) ", " (expr->pine (nth form 3)) ")"))
+(defmethod expr->pine :array.sort      [form] (str "array.sort(" (expr->pine (second form)) ")"))
+
+;; Backward compat aliases (pre-array.* names)
 (defmethod expr->pine :push  [form] (str "array.push(" (str/join ", " (map expr->pine (rest form))) ")"))
 (defmethod expr->pine :pop   [form] (str "array.pop(" (expr->pine (second form)) ")"))
 (defmethod expr->pine :size  [form] (str "array.size(" (expr->pine (second form)) ")"))
@@ -561,6 +587,107 @@
 (defmethod expr->pine :set   [form]
   (str "array.set(" (expr->pine (second form)) ", " (expr->pine (nth form 2)) ", " (expr->pine (nth form 3)) ")"))
 (defmethod expr->pine :sort  [form] (str "array.sort(" (expr->pine (second form)) ")"))
+
+;; P3: Extended array operations
+(doseq [[sym pine arity] [['array.insert "array.insert" 3] ['array.remove "array.remove" 2]
+                          ['array.clear "array.clear" 1] ['array.concat "array.concat" 2]
+                          ['array.slice "array.slice" 3] ['array.copy "array.copy" 1]
+                          ['array.shift "array.shift" 1] ['array.unshift "array.unshift" 2]
+                          ['array.includes "array.includes" 2] ['array.indexof "array.indexof" 2]
+                          ['array.lastindexof "array.lastindexof" 2]
+                          ['array.min "array.min" 1] ['array.max "array.max" 1]
+                          ['array.avg "array.avg" 1] ['array.median "array.median" 1]
+                          ['array.sum "array.sum" 1] ['array.stdev "array.stdev" 1]
+                          ['array.mode "array.mode" 1] ['array.range "array.range" 1]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; P3: Table operations
+(doseq [[sym pine] [['table.clear "table.clear"] ['table.delete "table.delete"]
+                    ['table.merge-cells "table.merge_cells"]
+                    ['table.set-position "table.set_position"] ['table.set-size "table.set_size"]
+                    ['table.set-color "table.set_color"] ['table.set-bgcolor "table.set_bgcolor"]
+                    ['table.set-border-color "table.set_border_color"]
+                    ['table.set-border-width "table.set_border_width"]
+                    ['table.get-location "table.get_location"] ['table.get-size "table.get_size"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; P4: String functions
+(doseq [[sym pine] [['str.contains "str.contains"] ['str.length "str.length"]
+                    ['str.split "str.split"] ['str.lower "str.lower"] ['str.upper "str.upper"]
+                    ['str.replace-all "str.replace_all"] ['str.substring "str.substring"]
+                    ['str.substr "str.substr"] ['str.startswith "str.startswith"]
+                    ['str.endswith "str.endswith"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; P4: Type conversion / str.tonumber
+(doseq [[sym pine] [['int "int"] ['float "float"] ['str.tonumber "str.tonumber"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; P4: timestamp
+(defmethod expr->pine :timestamp [form]
+  (str "timestamp(" (str/join ", " (map expr->pine (rest form))) ")"))
+
+;; P4: request.financial / request.random
+(defmethod expr->pine :financial [form]
+  (let [args (map expr->pine (rest form))]
+    (str "request.financial(syminfo.tickerid, " (str/join ", " args) ")")))
+(defmethod expr->pine :random [form]
+  (str "request.random(" (str/join ", " (map expr->pine (rest form))) ")"))
+
+;; P4: order.* functions
+(doseq [[sym pine] [['order.entry-condition "order.entry_condition"]
+                    ['order.exit-condition "order.exit_condition"]
+                    ['order.filled-condition "order.filled_condition"]
+                    ['order.filled "order.filled"] ['order.entry-id "order.entry_id"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; P4: chart.point
+(doseq [[sym pine] [['chart.point.now "chart.point.now"]
+                    ['chart.point.from-index "chart.point.from_index"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; P4: polygon
+(defmethod expr->pine :polygon.new [form]
+  (let [{:keys [positional keyword]} (parse-kwargs (drop 1 form))]
+    (str "polygon.new(" (str/join ", " (map expr->pine positional)) (emit-kwargs keyword) ")")))
+
+;; P4: Matrix
+(defmethod expr->pine :matrix.new [form]
+  (str "matrix.new<float>(" (str/join ", " (map expr->pine (rest form))) ")"))
+(doseq [[sym pine] [['matrix.rows "matrix.rows"] ['matrix.columns "matrix.columns"]
+                    ['matrix.size "matrix.size"] ['matrix.get "matrix.get"]
+                    ['matrix.set "matrix.set"] ['matrix.row "matrix.row"]
+                    ['matrix.col "matrix.col"] ['matrix.sum "matrix.sum"]
+                    ['matrix.transpose "matrix.transpose"]
+                    ['matrix.multiply "matrix.multiply"] ['matrix.inv "matrix.inv"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; P4: Map
+(defmethod expr->pine :map.new [form] "map.new<color, int>()")
+(doseq [[sym pine] [['map.put "map.put"] ['map.get "map.get"] ['map.delete "map.delete"]
+                    ['map.contains "map.contains"] ['map.keys "map.keys"]
+                    ['map.values "map.values"] ['map.size "map.size"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
+
+;; P4: time_close / time_tradingday
+(defmethod expr->pine :time.close [form]
+  (str "time_close" (when (number? (second form)) (str "[" (second form) "]"))))
+(defmethod expr->pine :time.tradingday [form] "time_tradingday")
+
+;; P4: ticker functions
+(doseq [[sym pine] [['ticker.heikinashi "ticker.heikinashi"] ['ticker.renko "ticker.renko"]
+                    ['ticker.linebreak "ticker.linebreak"] ['ticker.kagi "ticker.kagi"]
+                    ['ticker.pnf "ticker.pnf"] ['ticker.range "ticker.range"]]]
+  (defmethod expr->pine sym [form]
+    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
 
 ;; ─── P5: Table basics ──────────────────────────────────────────────
 (defmethod expr->pine :table.new [form]

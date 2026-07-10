@@ -10,15 +10,15 @@
 
 (deftest p0-exit-basic
   (is (= (gen/expr->pine '(exit "XL" :from "E" :loss 100 :profit 200))
-         "strategy.exit(\"XL\", from=\"E\", loss=100, profit=200)")))
+         "strategy.exit(\"XL\", from_entry=\"E\", loss=100, profit=200)")))
 
 (deftest p0-exit-with-trail
   (is (= (gen/expr->pine '(exit "XL" :from "E" :trail 50 :trail-offset 10))
-         "strategy.exit(\"XL\", from=\"E\", trail_points=50, trail_offset=10)")))
+         "strategy.exit(\"XL\", from_entry=\"E\", trail_points=50, trail_offset=10)")))
 
 (deftest p0-exit-minimal
   (is (= (gen/expr->pine '(exit "XL" :from "E"))
-         "strategy.exit(\"XL\", from=\"E\")")))
+         "strategy.exit(\"XL\", from_entry=\"E\")")))
 
 ;; ═══════════════════════════════════════════════════════════════════
 ;; P0: if/else multi-branch
