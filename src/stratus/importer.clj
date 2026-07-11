@@ -157,6 +157,21 @@
           (fn [[_ r g b]]
             (str "(rgb " (Integer/parseInt r 16) " " (Integer/parseInt g 16) " "
                  (Integer/parseInt b 16) " 100)")))
+        ;; == → = (Pine equality to LISP equality)
+        s (str/replace s #"(.+?)\s*==\s*(.+)" "(= $1 $2)")
+        s (str/replace s #"(.+?)\s*==\s*(.+)" "(= $1 $2)")
+        ;; != → (not (= ...)) (Pine inequality)
+        s (str/replace s #"(.+?)\s*!=\s*(.+)" "(not (= $1 $2))")
+        s (str/replace s #"(.+?)\s*!=\s*(.+)" "(not (= $1 $2))")
+        ;; and → (and ...) — 2 passes for chaining a and b and c
+        s (str/replace s #"(.+?)\s+and\s+(.+)" "(and $1 $2)")
+        s (str/replace s #"(.+?)\s+and\s+(.+)" "(and $1 $2)")
+        ;; or → (or ...) — 2 passes for chaining
+        s (str/replace s #"(.+?)\s+or\s+(.+)" "(or $1 $2)")
+        s (str/replace s #"(.+?)\s+or\s+(.+)" "(or $1 $2)")
+        ;; ==/!= third pass (catches leftovers inside and/or groups)
+        s (str/replace s #"(.+?)\s*==\s*(.+)" "(= $1 $2)")
+        s (str/replace s #"(.+?)\s*!=\s*(.+)" "(not (= $1 $2))")
         ;; Ternary ? : → iff
         s (str/replace s #"([^!=<>+\-*/%\s]+(?:\s*[><=!]+\s*[^,?:\n]+)?)\s*\?\s*([^:\n,]+)\s*:\s*([^,;\n]+)" "(iff $1 $2 $3)")
         ;; Inline // comments
