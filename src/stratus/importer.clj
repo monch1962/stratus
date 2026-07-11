@@ -163,10 +163,14 @@
         ;; != → (not (= ...)) (Pine inequality)
         s (str/replace s #"(.+?)\s*!=\s*(.+)" "(not (= $1 $2))")
         s (str/replace s #"(.+?)\s*!=\s*(.+)" "(not (= $1 $2))")
-        ;; and → (and ...) — 2 passes for chaining a and b and c
+        ;; and → (and ...) — 4 passes for longer chaining
         s (str/replace s #"(.+?)\s+and\s+(.+)" "(and $1 $2)")
         s (str/replace s #"(.+?)\s+and\s+(.+)" "(and $1 $2)")
-        ;; or → (or ...) — 2 passes for chaining
+        s (str/replace s #"(.+?)\s+and\s+(.+)" "(and $1 $2)")
+        s (str/replace s #"(.+?)\s+and\s+(.+)" "(and $1 $2)")
+        ;; or → (or ...) — 4 passes for longer chaining
+        s (str/replace s #"(.+?)\s+or\s+(.+)" "(or $1 $2)")
+        s (str/replace s #"(.+?)\s+or\s+(.+)" "(or $1 $2)")
         s (str/replace s #"(.+?)\s+or\s+(.+)" "(or $1 $2)")
         s (str/replace s #"(.+?)\s+or\s+(.+)" "(or $1 $2)")
         ;; ==/!= third pass (catches leftovers inside and/or groups)
