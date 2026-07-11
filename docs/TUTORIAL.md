@@ -244,7 +244,75 @@ hline(50, "Midline", color=color.gray, linestyle=hline.style_dotted)
 
 ---
 
-## Step 9: Iterate with `watch`
+## Step 9: Refactor with inline functions
+
+Repeated calculations make the indicator harder to maintain. Use `definline`
+to factor out reusable logic. Inline functions are expanded at compile time —
+they generate zero runtime overhead in Pine Script.
+
+The volatility calculation `(max (* (/ atr-val close) 100) 5.0)` is used once,
+but the concept of "scale by volatility" could apply to multiple thresholds.
+Let's define an inline function for the band offset:
+
+```clojure
+(definline band-offset [atr close min-vol]
+  (max (* (/ atr close) 100) min-vol))
+
+(indicator "Volatility Adaptive RSI" :overlay false :precision 2)
+(input-int "RSI Period" :def 14 :min 2 :max 50)
+(input-int "ATR Period"  :def 10 :min 1 :max 50)
+
+(def rsi-val (rsi rsi-period))
+(def atr-val (atr atr-period))
+
+;; band-offset expands to (max (* (/ atr-val close) 100) 5.0)
+(def vol (band-offset atr-val close 5.0))
+(def ob-level (+ 50 (/ vol 2)))
+(def os-level (- 50 (/ vol 2)))
+
+(plot rsi-val "RSI" :color blue :linewidth 2)
+(plot ob-level "Overbought Band" :color red :linewidth 1)
+(plot os-level "Oversold Band" :color green :linewidth 1)
+(hline 50 "Midline" :color gray :linestyle dotted)
+```
+
+**What the compiler sees** — `(band-offset atr-val close 5.0)` is replaced
+with `(max (* (/ atr-val close) 100) 5.0)` before Pine generation:
+
+```clojure
+;; After inline expansion, before Pine generation:
+(def vol (max (* (/ atr-val close) 100) 5.0))
+```
+
+**Multi-statement inlines** — for more complex refactoring, wrap setup steps:
+
+```clojure
+(definline configure-bands [period]
+  (def atr-val (atr period))
+  (def band (* (/ atr-val close) 100)))
+
+(configure-bands 14)
+;; Expands to:
+;; (def atr-val (atr 14))
+;; (def band (* (/ atr-val close) 100))
+```
+
+**Nested inlines** — inline functions can call other inline functions:
+
+```clojure
+(definline double [x] (* x 2))
+(definline quad [x] (double (double x)))
+
+(def y (quad 3))   ;; → (double (double 3)) → (* (* 3 2) 2) → 12
+```
+
+> Inline functions expand at compile time, not runtime. There is no
+> Pine Script function call overhead — the generated code is identical
+> to writing the expanded body by hand.
+
+---
+
+## Step 10: Iterate with `watch`
 
 For rapid iteration, use watch mode — it recompiles every time you save:
 
@@ -265,5 +333,6 @@ Now switch to TradingView and paste.
 | CLI reference | `docs/CLI.md` |
 | Full construct reference | `docs/REFERENCE.md` |
 | Testing strategies | `docs/TESTING.md` |
+| Inline functions (`definline`) | `src/stratus/inliner.clj` |
 | Backtesting with simulator | `./stratus simulate` |
 | Converting existing Pine Script | `./stratus import` |
