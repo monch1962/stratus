@@ -160,15 +160,9 @@
         ;; Ternary ? : → iff
         s (str/replace s #"([^!=<>+\-*/%\s]+(?:\s*[><=!]+\s*[^,?:\n]+)?)\s*\?\s*([^:\n,]+)\s*:\s*([^,;\n]+)" "(iff $1 $2 $3)")
         ;; Inline // comments
-        s (str/replace s #"\s*//.*" "")]
+        s (str/replace s #"\s*//.*" "")
+        ]
     s))
-
-(defn convert-expr-extended
-  "Additional expression conversions applied after standard convert-expr."
-  [s]
-  (-> s
-      ;; Inline // comments
-      (str/replace #"\s*//.*" "")))
 
 (defn convert-input [trimmed]
   (let [[_ itype] (re-find #"^input\.(\w+)\(" trimmed)
@@ -310,7 +304,7 @@
           (str "(defn " (to-kebab fname) " [" args "] " body ")"))
       (re-find #"^\s*if\s+" trimmed)
         (let [cond (str/trim (subs trimmed (+ 3 (str/index-of trimmed "if "))))]
-          (str "(if " (convert-expr cond) " ...)"))
+          (str "(if " (convert-expr cond) " :_)"))
       (re-find #"^\s*\w+\s*=" trimmed)
         (or (convert-assignment trimmed) (str "; " trimmed))
       ;; V3: Typed non-var declarations
@@ -351,5 +345,7 @@
         converted (for [line lines
                         :let [out (convert-line line)]
                         :when (not (str/blank? out))]
-                    out)]
-    (str (str/join "\n" converted) "\n")))
+                    out)
+        result (str/join "\n" converted)]
+    ;; Post-processing: single-quoted strings → double-quoted (EDN compat)
+    (str (str/replace result #"'([^']*)'" "\"$1\"") "\n")))

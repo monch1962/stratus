@@ -34,6 +34,7 @@ test:
 	$(BB) -m stratus.import-v3-test
 	$(BB) -m stratus.import-v4-test
 	$(BB) -m stratus.import-v5-test
+	$(BB) -m stratus.import-v6-test
 
 compile:
 	@echo "Compiling examples..."
