@@ -141,6 +141,13 @@
         s (str/replace s #"color\.(\w+)" "$1")
         s (str/replace s #"\bmath\.(\w+)\(" "($1 ")
         s (str/replace s #"\bvar(ip)?\s+" "")
+        ;; Convert Pine's `not` to LISP (not ...) — only when not already inside parens
+        s (str/replace s #"(?<![(\w])\bnot\s+" "(not ")
+        ;; Generic function calls: name(args) or dotted.name(args) → (name args) with kebab-case
+        s (str/replace s #"\b([a-z]\w+(?:\.\w+)*)\(([^)]*)\)"
+          (fn [[_ fname args]]
+            (let [args-trimmed (str/trim args)]
+              (str "(" (to-kebab fname) (if (seq args-trimmed) (str " " args-trimmed) "") ")"))))
         ;; Ternary ? : → iff
         s (str/replace s #"([^!=<>+\-*/%\s]+(?:\s*[><=!]+\s*[^,?:\n]+)?)\s*\?\s*([^:\n,]+)\s*:\s*([^,;\n]+)" "(iff $1 $2 $3)")
         ;; Inline // comments
@@ -242,7 +249,7 @@
       (re-find #"^\s*break\s*$" trimmed)
         "(break)"
       (re-find #"^\s*else\s+if\s+" trimmed)
-        (let [cond (str/trim (subs trimmed (+ 9 (str/index-of trimmed "else if "))))]
+        (let [cond (str/trim (subs trimmed (+ 8 (str/index-of trimmed "else if "))))]
           (str "else if " (convert-expr cond)))
       (re-find #"^\s*else\s*$" trimmed)
         "else"
