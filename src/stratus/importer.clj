@@ -323,7 +323,7 @@
           (str "(defn " (to-kebab fname) " [" args "] " body ")"))
       (re-find #"^\s*if\s+" trimmed)
         (let [cond (str/trim (subs trimmed (+ 3 (str/index-of trimmed "if "))))]
-          (str "(if " (convert-expr cond) " :_)"))
+          (str "(if " (convert-expr cond) ")"))
       (re-find #"^\s*\w+\s*=" trimmed)
         (or (convert-assignment trimmed) (str "; " trimmed))
       ;; V3: Typed non-var declarations
