@@ -140,8 +140,19 @@
         s (str/replace s #"color\.rgb\(([^)]+)\)" "(rgb $1)")
         s (str/replace s #"color\.(\w+)" "$1")
         s (str/replace s #"\bmath\.(\w+)\(" "($1 ")
-        s (str/replace s #"\bvar(ip)?\s+" "")]
+        s (str/replace s #"\bvar(ip)?\s+" "")
+        ;; Ternary ? : → iff
+        s (str/replace s #"([^!=<>+\-*/%\s]+(?:\s*[><=!]+\s*[^,?:\n]+)?)\s*\?\s*([^:\n,]+)\s*:\s*([^,;\n]+)" "(iff $1 $2 $3)")
+        ;; Inline // comments
+        s (str/replace s #"\s*//.*" "")]
     s))
+
+(defn convert-expr-extended
+  "Additional expression conversions applied after standard convert-expr."
+  [s]
+  (-> s
+      ;; Inline // comments
+      (str/replace #"\s*//.*" "")))
 
 (defn convert-input [trimmed]
   (let [[_ itype] (re-find #"^input\.(\w+)\(" trimmed)
@@ -207,6 +218,10 @@
         (or (convert-strategy-header trimmed) (str "; " trimmed))
       (re-find #"^input\.(\w+)\(" trimmed)
         (convert-input trimmed)
+      (re-find #"^var(ip)?\s+\w+\s+\w+\s*=" trimmed)
+        (let [[_ ip _type varname expr] (re-find #"^\s*var(ip)?\s+(\w+)\s+(\w+)\s*=\s*(.+)" trimmed)
+              expr-cleaned (convert-expr (or expr ""))]
+          (str "(defvar" (or ip "") " " (to-kebab varname) " " expr-cleaned ")"))
       (re-find #"^var(ip)?\s+\w+\s*=" trimmed)
         (let [[_ ip varname expr] (re-find #"^\s*var(ip)?\s+(\w+)\s*=\s*(.+)" trimmed)]
           (str "(defvar" (or ip "") " " (to-kebab varname) " " (convert-expr expr) ")"))
@@ -216,6 +231,13 @@
       (re-find #"^\s*switch\s+" trimmed)
         (let [[_ val] (re-find #"^\s*switch\s+(.+)" trimmed)]
           (str "; WARN: switch(" (str/trim val) ") — manual translation needed"))
+      (re-find #"^\s*for\s+" trimmed)
+        (let [[_ var coll] (re-find #"^\s*for\s+(\w+)\s+in\s+(.+)" trimmed)]
+          (str "(for [" var " " (str/trim coll) "] ...)"))
+      (re-find #"^\s*break\s*$" trimmed)
+        "(break)"
+      (re-find #"^\s*else\s*$" trimmed)
+        "else"
       (re-find #"strategy\.entry\(" trimmed)
         (str/replace trimmed
           #"strategy\.entry\(\"([^\"]+)\",\s*strategy\.(\w+)\)"
@@ -251,6 +273,9 @@
           (str "(" (to-kebab name) ")"))
       (re-find #"^str\.tostring\(" trimmed)
         (str/replace trimmed #"str\.tostring\((.+)\)" "(tostring $1)")
+      ;; Multi-line continuation (indented function args) — check RAW line before trim
+      (re-find #"^\s+(?:timestam|color\.|\w+\()" line)
+        (str "; " trimmed)
       (re-find #"^\s*export\s+" trimmed)
         (str "(export " (to-kebab (str/trim (subs trimmed 7))) ")")
       (re-find #"^\s*\w+\s*\(.*\)\s*=>" trimmed)
@@ -269,7 +294,10 @@
         (let [converted (convert-expr trimmed)]
           (if (not= converted trimmed)
             (str "; " converted)
-            (str "; WARN: cannot translate '" trimmed "'")))
+            ;; Try as a function call: name(arg1, arg2, ...)
+            (if (re-find #"^\w+\(.*\)$" trimmed)
+              (str "; " (convert-expr trimmed))
+              (str "; WARN: cannot translate '" trimmed "'"))))
       :else (str "; WARN: cannot translate '" trimmed "'"))))
 
 (defn convert

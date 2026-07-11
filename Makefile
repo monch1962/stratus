@@ -30,6 +30,7 @@ test:
 	$(BB) -m stratus.p2p3-remaining-test
 	$(BB) -m stratus.last-missing-test
 	$(BB) -m stratus.import-fix-test
+	$(BB) -m stratus.import-v2-test
 
 compile:
 	@echo "Compiling examples..."
