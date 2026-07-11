@@ -1,5 +1,6 @@
 (ns stratus.core
   (:require [stratus.reader :as reader]
+            [stratus.inliner :as inliner]
             [stratus.generator :as gen]
             [stratus.constructs :as constructs]
             [stratus.importer :as imp]
@@ -65,6 +66,7 @@
   (try
     (let [source (slurp in-path)
           ast    (reader/parse source)
+          ast    (inliner/expand-all ast)
           pine   (gen/emit-file ast)]
       pine)
     (catch java.io.FileNotFoundException e

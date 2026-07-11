@@ -77,8 +77,8 @@ Open TradingView → Pine Editor → **Ctrl+V** → **Ctrl+S** — your indicato
 
 ## Coverage
 
-**368 tests, 1269 assertions, 0 failures** across 22 suites (`make test`).
-**457 tests, 1631 assertions, 0 failures** across all 27 suites.
+**380 tests, 1287 assertions, 0 failures** across 23 suites (`make test`).
+**469 tests, 1649 assertions, 0 failures** across all 28 suites.
 
 ~150 constructs across indicators, conditions, logic, arithmetic, strategy actions,
 plotting, colours, arrays, tables, matrix, map, strings, drawing objects,

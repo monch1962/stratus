@@ -131,7 +131,7 @@
 
 (defmulti expr->pine
   (fn [form]
-    (if (list? form)
+    (if (or (list? form) (seq? form))
       (let [k (keyword (first form))
             price-syms #{:close :high :low :open :volume :hl2 :hlc3 :ohlc4}
             strat-syms (set (keys strategy-builtins-map))
@@ -199,6 +199,9 @@
        (emit-kwargs (:keyword (parse-kwargs (drop 2 form)))) ")"))
 
 ;; ─── Variable Bindings ──────────────────────────────────────────────
+
+(defmethod expr->pine :definline [form]
+  (str "// definline " (name (second form)) " — should have been expanded"))
 
 (defmethod expr->pine :def [form]
   (str (str/replace (name (second form)) #"-" "_") " = " (expr->pine (nth form 2))))
@@ -866,7 +869,9 @@
          (str/join "\n" (map expr->pine (by-type :table-cell)))
          (str/join "\n" (map expr->pine (by-type :line.new)))
          (str/join "\n" (map expr->pine (by-type :label.new)))
-         (str/join "\n" (map expr->pine (by-type :box.new)))]))))
+         (str/join "\n" (map expr->pine (by-type :box.new)))
+         ;; Inline function expansions (do blocks from definline)
+         (str/join "\n" (map expr->pine (by-type :do)))]))))
 
 ;; ═══════════════════════════════════════════════════════════════════
 ;; Additional generators (appended after main file for compat)
