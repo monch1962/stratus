@@ -148,6 +148,15 @@
           (fn [[_ fname args]]
             (let [args-trimmed (str/trim args)]
               (str "(" (to-kebab fname) (if (seq args-trimmed) (str " " args-trimmed) "") ")"))))
+        ;; Hex colors: #RRGGBB or #RRGGBBAA → (rgb R G B [A])
+        s (str/replace s #"#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})"
+          (fn [[_ r g b a]]
+            (str "(rgb " (Integer/parseInt r 16) " " (Integer/parseInt g 16) " "
+                 (Integer/parseInt b 16) " " (Integer/parseInt a 16) ")")))
+        s (str/replace s #"#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})\b"
+          (fn [[_ r g b]]
+            (str "(rgb " (Integer/parseInt r 16) " " (Integer/parseInt g 16) " "
+                 (Integer/parseInt b 16) " 100)")))
         ;; Ternary ? : → iff
         s (str/replace s #"([^!=<>+\-*/%\s]+(?:\s*[><=!]+\s*[^,?:\n]+)?)\s*\?\s*([^:\n,]+)\s*:\s*([^,;\n]+)" "(iff $1 $2 $3)")
         ;; Inline // comments
@@ -191,7 +200,7 @@
         parts (str/split args #",(?![^()]*\))(?![^']*'[^']*')")
         val (first parts)
         rest-args (str/join ", " (drop 1 parts))]
-    (str "(" fname " " (str/trim val)
+    (str "(" fname " " (convert-expr (str/trim val))
          (when (seq rest-args)
            (str " " (str/replace rest-args
                      #"(\w+)\s*=\s*(.+?)(?:,\s*|$)"
