@@ -38,6 +38,7 @@ test:
 	$(BB) -m stratus.import-if-test
 	$(BB) -m stratus.import-if-clean-test
 	$(BB) -m stratus.import-math-test
+	$(BB) -m stratus.import-refactor-test
 
 compile:
 	@echo "Compiling examples..."
