@@ -228,6 +228,11 @@
       (re-find #"^\s*\w+\s*:=\s*" trimmed)
         (let [[_ varname expr] (re-find #"^\s*(\w+)\s*:=\s*(.+)" trimmed)]
           (str "(set! " (to-kebab varname) " " (convert-expr expr) ")"))
+      ;; Compound assignment += -= *= /=
+      (re-find #"^\s*\w+\s*[+\-*/]=\s*" trimmed)
+        (let [[_ varname op expr] (re-find #"^\s*(\w+)\s*([+\-*/])=\s*(.+)" trimmed)
+              op-name (case op "+" "+" "-" "-" "*" "*" "/" "/")]
+          (str "(set! " (to-kebab varname) " (" op-name " " (to-kebab varname) " " (convert-expr expr) ")"))
       (re-find #"^\s*switch\s+" trimmed)
         (let [[_ val] (re-find #"^\s*switch\s+(.+)" trimmed)]
           (str "; WARN: switch(" (str/trim val) ") — manual translation needed"))
@@ -236,6 +241,9 @@
           (str "(for [" var " " (str/trim coll) "] ...)"))
       (re-find #"^\s*break\s*$" trimmed)
         "(break)"
+      (re-find #"^\s*else\s+if\s+" trimmed)
+        (let [cond (str/trim (subs trimmed (+ 9 (str/index-of trimmed "else if "))))]
+          (str "else if " (convert-expr cond)))
       (re-find #"^\s*else\s*$" trimmed)
         "else"
       (re-find #"strategy\.entry\(" trimmed)
@@ -289,6 +297,26 @@
           (str "(if " (convert-expr cond) " ...)"))
       (re-find #"^\s*\w+\s*=" trimmed)
         (or (convert-assignment trimmed) (str "; " trimmed))
+      ;; V3: Typed non-var declarations
+      (re-find #"^\s*(bool|string|int|float|line|label|color)\s+\w+\s*=" trimmed)
+        (let [[_ _type varname expr] (re-find #"^\s*(\w+)\s+(\w+)\s*=\s*(.+)" trimmed)]
+          (str "(def " (to-kebab varname) " " (convert-expr expr) ")"))
+      ;; V3: Bare na
+      (re-find #"^\s*na\s*$" trimmed) "na"
+      ;; V3: Switch case continuation ("..." =>)
+      (re-find #"^\s*\".*\"\s*=>\s*$" trimmed) (str "; " trimmed)
+      ;; V3: Bare and expression — split on "and" and wrap
+      (re-find #"\s+and\s+" trimmed)
+        (let [[_ left right] (re-find #"^\s*(.+?)\s+and\s+(.+)\s*$" trimmed)]
+          (if (and left right)
+            (str "; (and " (convert-expr (str/trim left)) " " (convert-expr (str/trim right)) ")")
+            (str "; WARN: cannot translate '" trimmed "'")))
+      ;; V3: Bare symbol (return value from function)
+      (re-find #"^\s*\w+\s*$" trimmed)
+        (str "; " (convert-expr trimmed))
+      ;; V3: Bare string literal (return value from function)
+      (re-find #"^\s*\".*\"\s*$" trimmed)
+        (str "; " (convert-expr trimmed))
       ;; Catch-all: try convert-expr on any remaining expression
       (re-find #"^\w+" trimmed)
         (let [converted (convert-expr trimmed)]

@@ -31,6 +31,7 @@ test:
 	$(BB) -m stratus.last-missing-test
 	$(BB) -m stratus.import-fix-test
 	$(BB) -m stratus.import-v2-test
+	$(BB) -m stratus.import-v3-test
 
 compile:
 	@echo "Compiling examples..."
