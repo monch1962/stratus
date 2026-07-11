@@ -148,6 +148,17 @@
           (fn [[_ fname args]]
             (let [args-trimmed (str/trim args)]
               (str "(" (to-kebab fname) (if (seq args-trimmed) (str " " args-trimmed) "") ")"))))
+        ;; Paren groups: (a + b) → operator conversion — only when content has operators
+        s (str/replace s #"(?<!\w)\(([^)]*(?:\s+[+*\/%-]\s+)[^)]*)\)"
+          (fn [match]
+            (let [inner (nth match 1)]
+              (convert-expr inner))))
+        ;; Binary operators — single pass, simple cases only
+        s (str/replace s #"([^\s(]+)\s*\*\s*([^\s(]+)" "(* $1 $2)")
+        s (str/replace s #"([^\s(]+)\s+/\s+([^\s(]+)" "(/ $1 $2)")
+        s (str/replace s #"([^\s(]+)\s*%\s*([^\s(]+)" "(% $1 $2)")
+        s (str/replace s #"([^\s(]+)\s*\+\s*([^\s(]+)" "(+ $1 $2)")
+        s (str/replace s #"([^\s(]+)\s+-\s+([^\s(]+)" "(- $1 $2)")
         ;; Hex colors: #RRGGBB or #RRGGBBAA → (rgb R G B [A])
         s (str/replace s #"#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})"
           (fn [[_ r g b a]]
