@@ -40,7 +40,7 @@
 
 (deftest precedence-div-after-sub
   (let [r (imp/convert "x = (high + low) / 2")]
-    ;; paren group converts (high + low) first
+    ;; paren group converts (high + low) first; surrounding / is approximate
     (is (not (str/includes? r "WARN")))))
 
 ;; ═══════════════════════════════════════════════════════════════════
