@@ -57,6 +57,30 @@
    [#"ta\.fixnan\(([^)]+)\)"                    "(fixnan $1)"]
    [#"ta\.stdev\([^,]+,\s*([^)]+)\)"            "(stdev $1)"]])
 
+(def strategy-builtins-map
+  {"strategy\\.position_size"     "(position-size)"
+   "strategy\\.position_avg_price" "(position-avg-price)"
+   "strategy\\.opentrades"        "(open-trades)"
+   "strategy\\.equity"            "(equity)"
+   "strategy\\.netprofit"         "(net-profit)"
+   "strategy\\.openprofit"        "(open-profit)"
+   "strategy\\.wintrades"         "(win-trades)"
+   "strategy\\.losstrades"        "(loss-trades)"
+   "strategy\\.closedtrades"      "(closed-trades)"
+   "strategy\\.grossprofit"       "(gross-profit)"
+   "strategy\\.grossloss"         "(gross-loss)"
+   "strategy\\.maxdrawdown"       "(max-drawdown)"
+   "strategy\\.maxrunup"          "(max-runup)"})
+
+(defn apply-until-stable
+  "Apply str/replace until the string stops changing (max N iterations)."
+  [s pattern replacement & [max-n]]
+  (let [max-n (or max-n 20)]
+    (loop [prev "" current s n 0]
+      (if (or (= prev current) (>= n max-n))
+        current
+        (recur current (str/replace current pattern replacement) (inc n))))))
+
 (defn to-pine-val
   "Map a Pine Script value to Stratus DSL."
   [v]
@@ -111,88 +135,54 @@
 (defn convert-expr
   "Convert a Pine Script expression to Stratus DSL."
   [expr]
-  (let [s (str/trim expr)
-        s (reduce (fn [acc [pat repl]] (str/replace acc pat repl)) s indicator-patterns)
-        s (str/replace s #"(\w+)\[(\d+)\]" "(#$1 $2)")
-        s (str/replace s #"\(#(\w+)\s" "($1 ")
-        s (str/replace s #"strategy\.position_size" "(position-size)")
-        s (str/replace s #"strategy\.position_avg_price" "(position-avg-price)")
-        s (str/replace s #"strategy\.opentrades" "(open-trades)")
-        s (str/replace s #"strategy\.equity" "(equity)")
-        s (str/replace s #"strategy\.netprofit" "(net-profit)")
-        s (str/replace s #"strategy\.openprofit" "(open-profit)")
-        s (str/replace s #"strategy\.wintrades" "(win-trades)")
-        s (str/replace s #"strategy\.losstrades" "(loss-trades)")
-        s (str/replace s #"strategy\.closedtrades" "(closed-trades)")
-        s (str/replace s #"strategy\.grossprofit" "(gross-profit)")
-        s (str/replace s #"strategy\.grossloss" "(gross-loss)")
-        s (str/replace s #"strategy\.maxdrawdown" "(max-drawdown)")
-        s (str/replace s #"strategy\.maxrunup" "(max-runup)")
-        s (str/replace s #"\bna\(([^)]+)\)" "(na $1)")
-        s (str/replace s #"\bnz\(([^)]+)\)" "(nz $1)")
-        s (str/replace s #"\biff\(([^,]+),\s*([^,]+),\s*([^)]+)\)" "(iff $1 $2 $3)")
-        s (str/replace s #"\bta\.cross\(([^,]+),\s*([^)]+)\)\s+and\s+\1\s*>\s*\2" "(crosses-above $1 $2)")
-        s (str/replace s #"\bta\.cross\(([^,]+),\s*([^)]+)\)\s+and\s+\1\s*<\s*\2" "(crosses-below $1 $2)")
-        s (str/replace s #"\brising\(([^,]+),\s*(\d+)\)" "(rising $1)")
-        s (str/replace s #"\bfalling\(([^,]+),\s*(\d+)\)" "(falling $1)")
-        s (str/replace s #"\bta\.(\w+)\(" "($1 ")
-        s (str/replace s #"color\.new\(\s*([^,]+)\s*,\s*(\d+)\s*\)" "(color $1 $2)")
-        s (str/replace s #"color\.rgb\(([^)]+)\)" "(rgb $1)")
-        s (str/replace s #"color\.(\w+)" "$1")
-        s (str/replace s #"\bmath\.(\w+)\(" "($1 ")
-        s (str/replace s #"\bvar(ip)?\s+" "")
-        ;; Convert Pine's `not` to LISP (not ...) — only when not already inside parens
-        s (str/replace s #"(?<![(\w])\bnot\s+" "(not ")
-        ;; Generic function calls: name(args) or dotted.name(args) → (name args) with kebab-case
-        s (str/replace s #"\b([a-z]\w+(?:\.\w+)*)\(([^)]*)\)"
-          (fn [[_ fname args]]
-            (let [args-trimmed (str/trim args)]
-              (str "(" (to-kebab fname) (if (seq args-trimmed) (str " " args-trimmed) "") ")"))))
-        ;; Paren groups: (a + b) → operator conversion — only when content has operators
-        s (str/replace s #"(?<!\w)\(([^)]*(?:\s+[+*\/%-]\s+)[^)]*)\)"
-          (fn [match]
-            (let [inner (nth match 1)]
-              (convert-expr inner))))
-        ;; Binary operators — single pass, simple cases only
-        s (str/replace s #"([^\s(]+)\s*\*\s*([^\s(]+)" "(* $1 $2)")
-        s (str/replace s #"([^\s(]+)\s+/\s+([^\s(]+)" "(/ $1 $2)")
-        s (str/replace s #"([^\s(]+)\s*%\s*([^\s(]+)" "(% $1 $2)")
-        s (str/replace s #"([^\s(]+)\s*\+\s*([^\s(]+)" "(+ $1 $2)")
-        s (str/replace s #"([^\s(]+)\s+-\s+([^\s(]+)" "(- $1 $2)")
-        ;; Hex colors: #RRGGBB or #RRGGBBAA → (rgb R G B [A])
-        s (str/replace s #"#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})"
-          (fn [[_ r g b a]]
-            (str "(rgb " (Integer/parseInt r 16) " " (Integer/parseInt g 16) " "
-                 (Integer/parseInt b 16) " " (Integer/parseInt a 16) ")")))
-        s (str/replace s #"#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})\b"
-          (fn [[_ r g b]]
-            (str "(rgb " (Integer/parseInt r 16) " " (Integer/parseInt g 16) " "
-                 (Integer/parseInt b 16) " 100)")))
-        ;; == → = (Pine equality to LISP equality)
-        s (str/replace s #"(.+?)\s*==\s*(.+)" "(= $1 $2)")
-        s (str/replace s #"(.+?)\s*==\s*(.+)" "(= $1 $2)")
-        ;; != → (not (= ...)) (Pine inequality)
-        s (str/replace s #"(.+?)\s*!=\s*(.+)" "(not (= $1 $2))")
-        s (str/replace s #"(.+?)\s*!=\s*(.+)" "(not (= $1 $2))")
-        ;; and → (and ...) — 4 passes for longer chaining
-        s (str/replace s #"(.+?)\s+and\s+(.+)" "(and $1 $2)")
-        s (str/replace s #"(.+?)\s+and\s+(.+)" "(and $1 $2)")
-        s (str/replace s #"(.+?)\s+and\s+(.+)" "(and $1 $2)")
-        s (str/replace s #"(.+?)\s+and\s+(.+)" "(and $1 $2)")
-        ;; or → (or ...) — 4 passes for longer chaining
-        s (str/replace s #"(.+?)\s+or\s+(.+)" "(or $1 $2)")
-        s (str/replace s #"(.+?)\s+or\s+(.+)" "(or $1 $2)")
-        s (str/replace s #"(.+?)\s+or\s+(.+)" "(or $1 $2)")
-        s (str/replace s #"(.+?)\s+or\s+(.+)" "(or $1 $2)")
-        ;; ==/!= third pass (catches leftovers inside and/or groups)
-        s (str/replace s #"(.+?)\s*==\s*(.+)" "(= $1 $2)")
-        s (str/replace s #"(.+?)\s*!=\s*(.+)" "(not (= $1 $2))")
-        ;; Ternary ? : → iff
-        s (str/replace s #"([^!=<>+\-*/%\s]+(?:\s*[><=!]+\s*[^,?:\n]+)?)\s*\?\s*([^:\n,]+)\s*:\s*([^,;\n]+)" "(iff $1 $2 $3)")
-        ;; Inline // comments
-        s (str/replace s #"\s*//.*" "")
-        ]
-    s))
+  (let [s (str/trim expr)]
+    (-> s
+      ((fn [s] (reduce (fn [acc [pat repl]] (str/replace acc pat repl)) s indicator-patterns)))
+      (#(str/replace % #"(\w+)\[(\d+)\]" "(#$1 $2)"))
+      (#(str/replace % #"\(#(\w+)\s" "($1 "))
+      (#(reduce (fn [acc [pat repl]] (str/replace acc (re-pattern pat) repl)) % strategy-builtins-map))
+      (#(str/replace % #"\bna\(([^)]+)\)" "(na $1)"))
+      (#(str/replace % #"\bnz\(([^)]+)\)" "(nz $1)"))
+      (#(str/replace % #"\biff\(([^,]+),\s*([^,]+),\s*([^)]+)\)" "(iff $1 $2 $3)"))
+      (#(str/replace % #"\bta\.cross\(([^,]+),\s*([^)]+)\)\s+and\s+\1\s*>\s*\2" "(crosses-above $1 $2)"))
+      (#(str/replace % #"\bta\.cross\(([^,]+),\s*([^)]+)\)\s+and\s+\1\s*<\s*\2" "(crosses-below $1 $2)"))
+      (#(str/replace % #"\brising\(([^,]+),\s*(\d+)\)" "(rising $1)"))
+      (#(str/replace % #"\bfalling\(([^,]+),\s*(\d+)\)" "(falling $1)"))
+      (#(str/replace % #"\bta\.(\w+)\(" "($1 "))
+      (#(str/replace % #"color\.new\(\s*([^,]+)\s*,\s*(\d+)\s*\)" "(color $1 $2)"))
+      (#(str/replace % #"color\.rgb\(([^)]+)\)" "(rgb $1)"))
+      (#(str/replace % #"color\.(\w+)" "$1"))
+      (#(str/replace % #"\bmath\.(\w+)\(" "($1 "))
+      (#(str/replace % #"\bvar(ip)?\s+" ""))
+      (#(str/replace % #"(?<![(\w])\bnot\s+" "(not "))
+      (#(str/replace % #"\b([a-z]\w+(?:\.\w+)*)\(([^)]*)\)"
+         (fn [[_ fname args]]
+           (let [args-trimmed (str/trim args)]
+             (str "(" (to-kebab fname) (if (seq args-trimmed) (str " " args-trimmed) "") ")")))))
+      (#(str/replace % #"(?<!\w)\(([^)]*(?:\s+[+*\/%-]\s+)[^)]*)\)"
+         (fn [match]
+           (let [inner (nth match 1)]
+             (convert-expr inner)))))
+      (#(str/replace % #"([^\s(]+)\s*\*\s*([^\s(]+)" "(* $1 $2)"))
+      (#(str/replace % #"([^\s(]+)\s+/\s+([^\s(]+)" "(/ $1 $2)"))
+      (#(str/replace % #"([^\s(]+)\s*%\s*([^\s(]+)" "(% $1 $2)"))
+      (#(str/replace % #"([^\s(]+)\s*\+\s*([^\s(]+)" "(+ $1 $2)"))
+      (#(str/replace % #"([^\s(]+)\s+-\s+([^\s(]+)" "(- $1 $2)"))
+      (#(str/replace % #"#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})"
+         (fn [[_ r g b a]]
+           (str "(rgb " (Integer/parseInt r 16) " " (Integer/parseInt g 16) " "
+                (Integer/parseInt b 16) " " (Integer/parseInt a 16) ")"))))
+      (#(str/replace % #"#([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})([0-9A-Fa-f]{2})\b"
+         (fn [[_ r g b]]
+           (str "(rgb " (Integer/parseInt r 16) " " (Integer/parseInt g 16) " "
+                (Integer/parseInt b 16) " 100)"))))
+      (#(apply-until-stable % #"(.+?)\s*==\s*(.+)" "(= $1 $2)"))
+      (#(apply-until-stable % #"(.+?)\s*!=\s*(.+)" "(not (= $1 $2))"))
+      (#(apply-until-stable % #"(.+?)\s+and\s+(.+)" "(and $1 $2)"))
+      (#(apply-until-stable % #"(.+?)\s+or\s+(.+)" "(or $1 $2)"))
+      (#(str/replace % #"([^!=<>+\-*/%\s]+(?:\s*[><=!]+\s*[^,?:\n]+)?)\s*\?\s*([^:\n,]+)\s*:\s*([^,;\n]+)" "(iff $1 $2 $3)"))
+      (#(str/replace % #"\s*//.*" ""))
+      (#(identity %)))))
 
 (defn convert-input [trimmed]
   (let [[_ itype] (re-find #"^input\.(\w+)\(" trimmed)
@@ -244,8 +234,82 @@
 (defn convert-table [trimmed]
   (str/replace trimmed #"^table\.(\w+)\((.+)\)"
     (fn [[_ fn-name args]]
-      (str "table-" (to-kebab fn-name) " " (str/join " " (map str/trim (str/split args #",\s*"))) ")"))))
+      (str "(table." (to-kebab fn-name) " " (str/join " " (map str/trim (str/split args #",\s*"))) ")"))))
 
+;; ─── Line dispatch table ─────────────────────────────────────────
+
+(def line-handlers
+  "Vector of [predicate-regex handler-fn] for convert-line dispatch.
+   Uses re-pattern with escaped strings for SCI compatibility."
+  (let [rp re-pattern]
+    [[(rp "^strategy|indicator|library\\(")       (fn [t line] (or (convert-strategy-header t) (str "; " t)))]
+     [(rp "^input\\.\\w+\\(")                     (fn [t line] (convert-input t))]
+     [(rp "^var(ip)?\\s+\\w+\\s+\\w+\\s*=")       (fn [t line]
+        (let [[_ ip _type varname expr] (re-find #"^\s*var(ip)?\s+(\w+)\s+(\w+)\s*=\s*(.+)" t)
+              expr-cleaned (convert-expr (or expr ""))]
+          (str "(defvar" (or ip "") " " (to-kebab varname) " " expr-cleaned ")")))]
+     [(rp "^var(ip)?\\s+\\w+\\s*=")               (fn [t line]
+        (let [[_ ip varname expr] (re-find #"^\s*var(ip)?\s+(\w+)\s*=\s*(.+)" t)]
+          (str "(defvar" (or ip "") " " (to-kebab varname) " " (convert-expr expr) ")")))]
+     [(rp "^\\s*\\w+\\s*:=\\s*")                  (fn [t line]
+        (let [[_ varname expr] (re-find #"^\s*(\w+)\s*:=\s*(.+)" t)]
+          (str "(set! " (to-kebab varname) " " (convert-expr expr) ")")))]
+     [(rp "^\\s*\\w+\\s*[+\\-*/]=\\s*")           (fn [t line]
+        (let [[_ varname op expr] (re-find #"^\s*(\w+)\s*([+\-*/])=\s*(.+)" t)
+              op-name (case op "+" "+" "-" "-" "*" "*" "/" "/")]
+          (str "(set! " (to-kebab varname) " (" op-name " " (to-kebab varname) " " (convert-expr expr) ")")))]
+     [(rp "^\\s*switch\\s+")                      (fn [t line] (let [[_ val] (re-find #"^\s*switch\s+(.+)" t)]
+                                                                 (str "; WARN: switch(" (str/trim val) ") -- manual translation needed")))]
+     [(rp "^\\s*for\\s+")                         (fn [t line] (let [[_ var coll] (re-find #"^\s*for\s+(\w+)\s+in\s+(.+)" t)]
+                                                                 (str "(for [" var " " (str/trim coll) "] ...)")))]
+     [(rp "^\\s*break\\s*$")                      (fn [t line] "(break)")]
+     [(rp "^\\s*else\\s+if\\s+")                  (fn [t line] (let [cond (str/trim (subs t (+ 8 (str/index-of t "else if "))))]
+                                                                 (str "else if " (convert-expr cond))))]
+     [(rp "^\\s*else\\s*$")                       (fn [t line] "else")]
+     [(rp "strategy\\.entry\\(")                  (fn [t line] (str/replace t #"strategy\.entry\(\"([^\"]+)\",\s*strategy\.(\w+)\)"
+                                                                             (fn [[_ label dir]] (str "(" ({"long" "long", "short" "short"} dir) " \"" label "\")"))))]
+     [(rp "strategy\\.close\\(")                  (fn [t line] (str/replace t #"strategy\.close\(\"([^\"]+)\"\)" "(close \"$1\")"))]
+     [(rp "strategy\\.exit\\(")                   (fn [t line] (convert-exit t))]
+     [(rp "strategy\\.order\\(")                  (fn [t line] (convert-order t))]
+     [(rp "strategy\\.cancel\\(")                 (fn [t line] (str/replace t #"strategy\.cancel\(\"([^\"]+)\"\)" "(cancel \"$1\")"))]
+     [(rp "^\\s*\\w+\\s*=\\s*input\\.\\w+\\(")    (fn [t line] (let [[_ varname expr] (re-find #"^\s*(\w+)\s*=\s*(input\..+)" t)]
+                                                                 (str "(def " (to-kebab varname) " " (convert-input expr) ")")))]
+     [(rp "^(plotshape|plotchar|plotarrow|plot|hline|bgcolor|barcolor|fill|alertcondition)\\(") (fn [t line] (convert-plot t))]
+     [(rp "^array\\.\\w+\\(")                     (fn [t line] (convert-array t))]
+     [(rp "^(line|label|box|polygon)\\.\\w+\\(")  (fn [t line] (convert-drawing t))]
+     [(rp "^table\\.\\w+\\(")                     (fn [t line] (convert-table t))]
+     [(rp "^request\\.security\\(")               (fn [t line] (str/replace t #"request\.security\([^,]+,\s*\"([^\"]+)\",\s*(.+)\)"
+                                                                             (fn [[_ tf expr]] (str "(security \"" tf "\" " (convert-expr expr) ")"))))]
+     [(rp "^barstate\\.\\w+")                     (fn [t line] (if-let [kw (get barstate-map t)] (str "(" kw ")") (str "; " t)))]
+     [(rp "^syminfo\\.\\w+")                      (fn [t line] (let [[_ name] (re-find #"^syminfo\.(\w+)" t)]
+                                                                 (str "(" (to-kebab name) ")")))]
+     [(rp "^str\\.tostring\\(")                   (fn [t line] (str/replace t #"str\.tostring\((.+)\)" "(tostring $1)"))]
+     [(rp "^\\s*export\\s+")                      (fn [t line] (str "(export " (to-kebab (str/trim (subs t 7))) ")"))]
+     [(rp "^\\s*\\w+\\s*\\(.*\\)\\s*=>")          (fn [t line]
+        (let [[_ fname args] (re-find #"^\s*(\w+)\(([^)]*)\)\s*=>" t)
+              body-start (+ 2 (str/index-of t "=>"))
+              body-raw (subs t (min body-start (count t)))]
+          (str "(defn " (to-kebab fname) " [" args "] " (convert-expr (str/trim body-raw)) ")")))]
+     [(rp "^\\s*if\\s+")                          (fn [t line] (let [cond (str/trim (subs t (+ 3 (str/index-of t "if "))))]
+                                                                 (str "(if " (convert-expr cond) ")")))]
+     [(rp "^\\s*\\w+\\s*=")                       (fn [t line] (or (convert-assignment t) (str "; " t)))]
+     [(rp "^\\s*(bool|string|int|float|line|label|color)\\s+\\w+\\s*=") (fn [t line]
+        (let [[_ _type varname expr] (re-find #"^\s*(\w+)\s+(\w+)\s*=\s*(.+)" t)]
+          (str "(def " (to-kebab varname) " " (convert-expr expr) ")")))]
+     [(rp "^\\s*na\\s*$")                         (fn [t line] "na")]
+     [(rp "^\\s*\".*\"\\s*=>\\s*$")               (fn [t line] (str "; " t))]
+     [(rp "\\s+and\\s+")                          (fn [t line] (let [[_ left right] (re-find #"^\s*(.+?)\s+and\s+(.+)\s*$" t)]
+                                                                 (if (and left right)
+                                                                   (str "; (and " (convert-expr (str/trim left)) " " (convert-expr (str/trim right)) ")")
+                                                                   (str "; WARN: cannot translate '" t "'"))))]
+     [(rp "^\\s*\\w+\\s*$")                       (fn [t line] (str "; " (convert-expr t)))]
+     [(rp "^\\s*\".*\"\\s*$")                     (fn [t line] (str "; " (convert-expr t)))]
+     [(rp "^\\w+")                                (fn [t line] (let [converted (convert-expr t)]
+                                                                 (if (not= converted t)
+                                                                   (str "; " converted)
+                                                                   (if (re-find #"^\w+\(.*\)$" t)
+                                                                     (str "; " (convert-expr t))
+                                                                     (str "; WARN: cannot translate '" t "'")))))]]))
 (defn convert-line
   "Convert a single line of Pine Script to its Stratus equivalent."
   [line]
@@ -254,119 +318,12 @@
       (str/blank? trimmed) ""
       (str/starts-with? trimmed "//@version") ""
       (str/starts-with? trimmed "//") (str/replace trimmed #"^//" ";")
-      (re-find #"^(strategy|indicator|library)\(" trimmed)
-        (or (convert-strategy-header trimmed) (str "; " trimmed))
-      (re-find #"^input\.(\w+)\(" trimmed)
-        (convert-input trimmed)
-      (re-find #"^var(ip)?\s+\w+\s+\w+\s*=" trimmed)
-        (let [[_ ip _type varname expr] (re-find #"^\s*var(ip)?\s+(\w+)\s+(\w+)\s*=\s*(.+)" trimmed)
-              expr-cleaned (convert-expr (or expr ""))]
-          (str "(defvar" (or ip "") " " (to-kebab varname) " " expr-cleaned ")"))
-      (re-find #"^var(ip)?\s+\w+\s*=" trimmed)
-        (let [[_ ip varname expr] (re-find #"^\s*var(ip)?\s+(\w+)\s*=\s*(.+)" trimmed)]
-          (str "(defvar" (or ip "") " " (to-kebab varname) " " (convert-expr expr) ")"))
-      (re-find #"^\s*\w+\s*:=\s*" trimmed)
-        (let [[_ varname expr] (re-find #"^\s*(\w+)\s*:=\s*(.+)" trimmed)]
-          (str "(set! " (to-kebab varname) " " (convert-expr expr) ")"))
-      ;; Compound assignment += -= *= /=
-      (re-find #"^\s*\w+\s*[+\-*/]=\s*" trimmed)
-        (let [[_ varname op expr] (re-find #"^\s*(\w+)\s*([+\-*/])=\s*(.+)" trimmed)
-              op-name (case op "+" "+" "-" "-" "*" "*" "/" "/")]
-          (str "(set! " (to-kebab varname) " (" op-name " " (to-kebab varname) " " (convert-expr expr) ")"))
-      (re-find #"^\s*switch\s+" trimmed)
-        (let [[_ val] (re-find #"^\s*switch\s+(.+)" trimmed)]
-          (str "; WARN: switch(" (str/trim val) ") — manual translation needed"))
-      (re-find #"^\s*for\s+" trimmed)
-        (let [[_ var coll] (re-find #"^\s*for\s+(\w+)\s+in\s+(.+)" trimmed)]
-          (str "(for [" var " " (str/trim coll) "] ...)"))
-      (re-find #"^\s*break\s*$" trimmed)
-        "(break)"
-      (re-find #"^\s*else\s+if\s+" trimmed)
-        (let [cond (str/trim (subs trimmed (+ 8 (str/index-of trimmed "else if "))))]
-          (str "else if " (convert-expr cond)))
-      (re-find #"^\s*else\s*$" trimmed)
-        "else"
-      (re-find #"strategy\.entry\(" trimmed)
-        (str/replace trimmed
-          #"strategy\.entry\(\"([^\"]+)\",\s*strategy\.(\w+)\)"
-          (fn [[_ label dir]] (str "(" ({"long" "long", "short" "short"} dir) " \"" label "\")")))
-      (re-find #"strategy\.close\(" trimmed)
-        (str/replace trimmed #"strategy\.close\(\"([^\"]+)\"\)" "(close \"$1\")")
-      (re-find #"strategy\.exit\(" trimmed)
-        (convert-exit trimmed)
-      (re-find #"strategy\.order\(" trimmed)
-        (convert-order trimmed)
-      (re-find #"strategy\.cancel\(" trimmed)
-        (str/replace trimmed #"strategy\.cancel\(\"([^\"]+)\"\)" "(cancel \"$1\")")
-      ;; input.* in assignment — catch BEFORE plain =
-      (re-find #"^\s*\w+\s*=\s*input\.\w+\(" trimmed)
-        (let [[_ varname expr] (re-find #"^\s*(\w+)\s*=\s*(input\..+)" trimmed)]
-          (str "(def " (to-kebab varname) " " (convert-input expr) ")"))
-      (re-find #"^(plotshape|plotchar|plotarrow|plot|hline|bgcolor|barcolor|fill|alertcondition)\(" trimmed)
-        (convert-plot trimmed)
-      (re-find #"^array\.\w+\(" trimmed)
-        (convert-array trimmed)
-      (re-find #"^(line|label|box|polygon)\.\w+\(" trimmed)
-        (convert-drawing trimmed)
-      (re-find #"^table\.\w+\(" trimmed)
-        (convert-table trimmed)
-      (re-find #"^request\.security\(" trimmed)
-        (str/replace trimmed #"request\.security\([^,]+,\s*\"([^\"]+)\",\s*(.+)\)"
-          (fn [[_ tf expr]] (str "(security \"" tf "\" " (convert-expr expr) ")")))
-      (re-find #"^barstate\.\w+" trimmed)
-        (let [kw (get barstate-map trimmed)]
-          (if kw (str "(" kw ")") (str "; " trimmed)))
-      (re-find #"^syminfo\.\w+" trimmed)
-        (let [[_ name] (re-find #"^syminfo\.(\w+)" trimmed)]
-          (str "(" (to-kebab name) ")"))
-      (re-find #"^str\.tostring\(" trimmed)
-        (str/replace trimmed #"str\.tostring\((.+)\)" "(tostring $1)")
-      ;; Multi-line continuation (indented function args) — check RAW line before trim
-      (re-find #"^\s+(?:timestam|color\.|\w+\()" line)
-        (str "; " trimmed)
-      (re-find #"^\s*export\s+" trimmed)
-        (str "(export " (to-kebab (str/trim (subs trimmed 7))) ")")
-      (re-find #"^\s*\w+\s*\(.*\)\s*=>" trimmed)
-        (let [[_ fname args] (re-find #"^\s*(\w+)\(([^)]*)\)\s*=>" trimmed)
-              body-start (+ 2 (str/index-of trimmed "=>"))
-              body-raw (subs trimmed (min body-start (count trimmed)))
-              body (convert-expr (str/trim body-raw))]
-          (str "(defn " (to-kebab fname) " [" args "] " body ")"))
-      (re-find #"^\s*if\s+" trimmed)
-        (let [cond (str/trim (subs trimmed (+ 3 (str/index-of trimmed "if "))))]
-          (str "(if " (convert-expr cond) ")"))
-      (re-find #"^\s*\w+\s*=" trimmed)
-        (or (convert-assignment trimmed) (str "; " trimmed))
-      ;; V3: Typed non-var declarations
-      (re-find #"^\s*(bool|string|int|float|line|label|color)\s+\w+\s*=" trimmed)
-        (let [[_ _type varname expr] (re-find #"^\s*(\w+)\s+(\w+)\s*=\s*(.+)" trimmed)]
-          (str "(def " (to-kebab varname) " " (convert-expr expr) ")"))
-      ;; V3: Bare na
-      (re-find #"^\s*na\s*$" trimmed) "na"
-      ;; V3: Switch case continuation ("..." =>)
-      (re-find #"^\s*\".*\"\s*=>\s*$" trimmed) (str "; " trimmed)
-      ;; V3: Bare and expression — split on "and" and wrap
-      (re-find #"\s+and\s+" trimmed)
-        (let [[_ left right] (re-find #"^\s*(.+?)\s+and\s+(.+)\s*$" trimmed)]
-          (if (and left right)
-            (str "; (and " (convert-expr (str/trim left)) " " (convert-expr (str/trim right)) ")")
-            (str "; WARN: cannot translate '" trimmed "'")))
-      ;; V3: Bare symbol (return value from function)
-      (re-find #"^\s*\w+\s*$" trimmed)
-        (str "; " (convert-expr trimmed))
-      ;; V3: Bare string literal (return value from function)
-      (re-find #"^\s*\".*\"\s*$" trimmed)
-        (str "; " (convert-expr trimmed))
-      ;; Catch-all: try convert-expr on any remaining expression
-      (re-find #"^\w+" trimmed)
-        (let [converted (convert-expr trimmed)]
-          (if (not= converted trimmed)
-            (str "; " converted)
-            ;; Try as a function call: name(arg1, arg2, ...)
-            (if (re-find #"^\w+\(.*\)$" trimmed)
-              (str "; " (convert-expr trimmed))
-              (str "; WARN: cannot translate '" trimmed "'"))))
-      :else (str "; WARN: cannot translate '" trimmed "'"))))
+      ;; Multi-line continuation — check RAW line before trim
+      (re-find #"^\s+(?:timestam|color\.|\w+\()" line) (str "; " trimmed)
+      :else
+      (some (fn [[pred handler]]
+              (when (re-find pred trimmed) (handler trimmed line)))
+            line-handlers))))
 
 (defn convert
   "Convert full Pine Script v6 source to Stratus DSL."
