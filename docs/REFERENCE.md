@@ -1,6 +1,6 @@
 # Pine Script ↔ Stratus Cross-Reference
 
-Stratus covers **490 tests** across **29 suites** with **~150 constructs** mapped to Pine Script v6.
+Stratus covers **514 tests** across **30 suites** with **~150 constructs** mapped to Pine Script v6.
 
 ## Declarations
 
@@ -165,16 +165,29 @@ Stratus covers **490 tests** across **29 suites** with **~150 constructs** mappe
 | `strategy.order("O", strategy.long, limit=50)` | `(order "O" :long 50.0 :limit 50)` |
 | `strategy.cancel("O")` | `(cancel "O")` |
 
-## Control Flow
+## Control Flow & Clojure Expansions
 
 | Pine Script | Stratus DSL |
 |---|---|
 | `if cond` | `(if cond action)` |
 | `if cond action else other` | `(if cond action :else other)` |
 | `if a x else if b y else z` | `(if a x b y :else z)` |
-| `for i = 1 to 5` | `(for [i (range 1 5)] ...)` |
+| `for i = 1 to 5` | `(for [i (range 1 5)] ...)` or `(for [i 1 5] ...)` |
+| `for i in [1, 2, 3]` | `(for [i [1 2 3]] ...)` *(compile-time unroll)* |
 | `while cond` | `(while cond ...)` |
 | `switch expr\n  val => action` | `(switch expr val action ...)` |
+| *(no Pine equivalent)* | `(let [x expr] body)` — inline substitution |
+| *(no Pine equivalent)* | `(let [[a b] (macd)] ...)` — tuple destructuring |
+| *(no Pine equivalent)* | `(-> x (f a) (g b))` — thread-first macro |
+| *(no Pine equivalent)* | `(->> x (f a) (g b))` — thread-last macro |
+| *(no Pine equivalent)* | `(some-> x (f a))` — nil-safe thread (na guard) |
+| *(no Pine equivalent)* | `(cond-> x test step)` — conditional thread |
+| *(no Pine equivalent)* | `(as-> x name step)` — named thread |
+| *(no Pine equivalent)* | `(for [x [1 2 3]] body)` — list comprehension |
+| *(no Pine equivalent)* | `(defmacro name [args] body)` — compile-time macro |
+| *(no Pine equivalent)* | `(defn f ([x] body1) ([x y] body2))` — multi-arity |
+| *(no Pine equivalent)* | `(cond test expr :else default)` — multi-branch |
+| *(no Pine equivalent)* | `(comment ...)` — removed from output |
 | `val =>` default | `(switch expr val action :else action)` |
 
 ## Plotting & Visuals

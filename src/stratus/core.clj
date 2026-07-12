@@ -209,11 +209,12 @@
                                :array.push :array.pop :array.size :array.get :array.set
                                :array.sort :array.fill :array.reverse
                                :push :pop :size :get :set :sort
-                               :multiset :export :definline :comment
+                               :multiset :export :definline :defmacro :comment
                                :pi :tau :e :phi :round :pow :min :max
                                :time.close :time.tradingday
                                :chart.point.now :chart.point.from-index
-                               :polygon.new :polygon.delete]))
+                               :polygon.new :polygon.delete
+                               :let :-> :->> :some-> :some->> :cond-> :as->]))
         categories [["Declarations" [:strategy :indicator :library :def :defvar :defvarip :set! :defn :definline :defmacro :export :comment]]
                     ["Price Built-ins" [:close :high :low :open :volume :hl2 :hlc3 :ohlc4
                                        :time :time.close :time.tradingday :bar-index
@@ -300,7 +301,7 @@
                     ["Order" [:order.entry-condition :order.exit-condition
                              :order.filled-condition :order.filled :order.entry-id]]
                     ["Type Predicates" [:series :array :string :int :float :bool]]
-                    ["Misc" [:multiset :comment :definline]]]]
+                    ["Misc" [:multiset :comment :definline :let :-> :->> :some-> :some->> :cond-> :as->]]]]
     (println (str "Available constructs (" (count all-keys) " total):\n"))
     (doseq [[cat-label cat-keys] categories]
       (let [present (sort (filter all-keys cat-keys))]
