@@ -129,7 +129,7 @@
 (deftest advanced-exit-compiles
   (let [o (compile-example "advanced-exit")]
     (is (str/includes? o "strategy.exit"))
-    (is (str/includes? o "from=\"ENTER\""))
+    (is (str/includes? o "from_entry=\"ENTER\""))
     (is (str/includes? o "profit=20"))
     (is (str/includes? o "loss="))
     (is (str/includes? o "trail_points="))

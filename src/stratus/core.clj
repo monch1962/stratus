@@ -1,8 +1,8 @@
 (ns stratus.core
   (:require [stratus.reader :as reader]
             [stratus.inliner :as inliner]
+            [stratus.expander :as expander]
             [stratus.generator :as gen]
-            [stratus.constructs :as constructs]
             [stratus.importer :as imp]
             [stratus.simulator :as sim]
             [stratus.exporter :as exp]
@@ -66,6 +66,7 @@
   (try
     (let [source (slurp in-path)
           ast    (reader/parse source)
+          ast    (expander/expand-all ast)
           ast    (inliner/expand-all ast)
           pine   (gen/emit-file ast)]
       pine)
@@ -177,19 +178,137 @@
 
 (defn list-constructs
   []
-  (println "Available constructs (" (count constructs/constructs) "total):\n")
-  (doseq [[cat-label cat-sym] [["Declarations" :decl] ["Price Sources" :builtin]
-                                ["Indicators" :indicator] ["Conditions" :condition]
-                                ["Logic / Comparison" :logic] ["Actions" :action]
-                                ["Plotting / Alerts" :plot] ["Inputs" :input]
-                                ["Math & Stats" :stat] ["Control Flow" :control]
-                                ["Drawing & Tables" :drawing]]]
-    (let [cat-constructs (filter #(= (:category %) cat-sym) constructs/constructs)]
-      (when (seq cat-constructs)
-        (println "  " cat-label ":")
-        (doseq [c cat-constructs]
-          (println (str "    " (name (:name c)) "  " (or (:summary c) (:doc c) ""))))
-        (println)))))
+  (let [all-keys (set (concat (keys gen/pine-simple-map)
+                              [:strategy :indicator :library :def :defvar :defvarip :set!
+                               :defn :definline :comment
+                               :sma :ema :rsi :wma :vwma :hma :macd :adx :stoch :bb :atr
+                               :cross :tr :range :roc :swma :rma :tema :dema :smma
+                               :supertrend :sar :vwap :stdev :cci :mfi :obv :linreg :kc :alma
+                               :highest :lowest :cum :highestbars :lowestbars :sum :avg
+                               :fixnan :valuewhen :correlation :covariance :median :mode
+                               :percentile :in-session :cmo :wad :mama :cog :vwmacd
+                               :crossover :crossunder
+                               :crosses-above :crosses-below :rising :falling
+                               :na :nz :iff :change :mom
+                               :and :or :not :> :< :>= :<= := :+ :- :* :/ :%
+                               :long :short :close :close-all :reverse :exit :order :cancel
+                               :plot :plotshape :plotchar :plotarrow :hline :bgcolor
+                               :barcolor :fill :alertcondition
+                               :color :rgb :from-gradient :tostring
+                               :input-int :input-float :input-bool :input-string
+                               :input-color :input-source :input-symbol :input-timeframe
+                               :input-price :input-session
+                               :security :security-lower-tf :financial :random :seed
+                               :timestamp :ticker.modify
+                               :if :when :do :for :while :switch :on-bar
+                               :line.new :line.delete :label.new :label.delete
+                               :box.new :box.delete :polygon.new :polygon.delete
+                               :table.new :table-cell :map.new :matrix.new
+                               :array-int :array-float :array-bool :array-string
+                               :array-color :array-line :array-label :array-box :array-table
+                               :array.push :array.pop :array.size :array.get :array.set
+                               :array.sort :array.fill :array.reverse
+                               :push :pop :size :get :set :sort
+                               :multiset :export :definline :comment
+                               :pi :tau :e :phi :round :pow :min :max
+                               :time.close :time.tradingday
+                               :chart.point.now :chart.point.from-index
+                               :polygon.new :polygon.delete]))
+        categories [["Declarations" [:strategy :indicator :library :def :defvar :defvarip :set! :defn :definline :export :comment]]
+                    ["Price Built-ins" [:close :high :low :open :volume :hl2 :hlc3 :ohlc4
+                                       :time :time.close :time.tradingday :bar-index
+                                       :ticker :timeframe :year :month :dayofweek :dayofmonth
+                                       :hour :minute :second :weekofyear :quarter
+                                       :bar-confirmed :bar-first :bar-last :bar-new
+                                       :bar-realtime :bar-history
+                                       :mintick :pointvalue :sym-session :sym-description
+                                       :sym-type :currency :base-currency :price-scale
+                                       :min-move :sym-sector :sym-industry
+                                       :dividends :splits :earnings
+                                       :position-size :position-avg-price :open-trades
+                                       :equity :net-profit :open-profit :win-trades
+                                       :loss-trades :closed-trades :gross-profit :gross-loss
+                                       :max-drawdown :max-runup :allow-entry-in
+                                       :max-intraday-orders]]
+                    ["Indicators" [:sma :ema :rsi :wma :vwma :hma :macd :adx :stoch :bb :atr
+                                  :cross :tr :range :roc :swma :rma :tema :dema :smma
+                                  :supertrend :sar :vwap :stdev :cci :mfi :obv :linreg
+                                  :kc :alma :highest :lowest :cum :highestbars :lowestbars
+                                  :sum :avg :fixnan :valuewhen :cmo :wad :mama :cog :vwmacd
+                                  :correlation :covariance :median :mode :percentile
+                                  :crossover :crossunder :in-session
+                                  :highest :lowest :cum :highestbars :lowestbars]]
+                    ["Conditions" [:crosses-above :crosses-below :rising :falling
+                                  :na :nz :iff :change :mom]]
+                    ["Logic / Math" [:and :or :not :> :< :>= :<= := :+ :- :* :/ :%
+                                    :log :log10 :exp :sqrt :abs :ceil :floor :sign
+                                    :round :pow :min :max :pi :tau :e :phi
+                                    :timestamp :int :float :str.tonumber]]
+                    ["Actions" [:long :short :close :close-all :reverse :exit :order :cancel]]
+                    ["Plotting / Alerts" [:plot :plotshape :plotchar :plotarrow :hline
+                                         :bgcolor :barcolor :fill :alertcondition
+                                         :color :rgb :from-gradient :tostring]]
+                    ["Inputs" [:input-int :input-float :input-bool :input-string
+                              :input-color :input-source :input-symbol :input-timeframe
+                              :input-price :input-session]]
+                    ["Control Flow" [:if :when :do :for :while :switch :on-bar]]
+                    ["Arrays" [:array-int :array-float :array-bool :array-string
+                              :array-color :array-line :array-label :array-box :array-table
+                              :array.push :array.pop :array.size :array.get :array.set
+                              :array.sort :array.fill :array.reverse
+                              :push :pop :size :get :set :sort
+                              :array.insert :array.remove :array.clear :array.concat
+                              :array.slice :array.copy :array.shift :array.unshift
+                              :array.includes :array.indexof :array.lastindexof
+                              :array.min :array.max :array.avg :array.median
+                              :array.sum :array.stdev :array.mode :array.range]]
+                    ["Tables" [:table.new :table-cell :table.clear :table.delete
+                              :table.merge-cells :table.set-position :table.set-size
+                              :table.set-color :table.set-bgcolor :table.set-border-color
+                              :table.set-border-width :table.get-location :table.get-size]]
+                    ["Strings" [:str.contains :str.length :str.split :str.lower :str.upper
+                               :str.replace-all :str.substring :str.substr :str.startswith
+                               :str.endswith :tostring :str.tonumber]]
+                    ["Drawing" [:line.new :line.delete :line.set-color :line.set-width
+                               :line.set-extend :line.set-style :line.set-xloc
+                               :line.get-x1 :line.get-x2 :line.get-y1 :line.get-y2 :line.get-price
+                               :label.new :label.delete :label.set-color :label.set-text
+                               :label.set-x :label.set-y :label.set-style
+                               :label.set-textcolor :label.set-textalign :label.set-size
+                               :label.get-x :label.get-y :label.get-text
+                               :box.new :box.delete :box.set-color :box.set-border-color
+                               :box.set-width :box.set-extend :box.set-style
+                               :box.get-left :box.get-top :box.get-right :box.get-bottom
+                               :polygon.new :polygon.delete :polygon.set-fillcolor
+                               :polygon.set-bordercolor :polygon.set-borderwidth
+                               :polygon.get-fillcolor :polygon.get-bordercolor :polygon.get-borderwidth]]
+                    ["Matrix / Map" [:matrix.new :matrix.float :matrix.int :matrix.bool
+                                    :matrix.string :matrix.color :matrix.line
+                                    :matrix.label :matrix.box :matrix.table
+                                    :matrix.rows :matrix.columns :matrix.size :matrix.get
+                                    :matrix.set :matrix.row :matrix.col :matrix.sum
+                                    :matrix.transpose :matrix.multiply :matrix.inv
+                                    :matrix.fill :matrix.det :matrix.rank :matrix.pinv
+                                    :map.new :map.put :map.get :map.delete :map.contains
+                                    :map.keys :map.values :map.size]]
+                    ["Ticker / Security" [:ticker.heikinashi :ticker.renko :ticker.linebreak
+                                        :ticker.kagi :ticker.pnf :ticker.range :ticker.new
+                                        :ticker.modify
+                                        :security :security-lower-tf :financial :random :seed
+                                        :chart.point.now :chart.point.from-index]]
+                    ["Colors" [:color.r :color.g :color.b :color.t]]
+                    ["Order" [:order.entry-condition :order.exit-condition
+                             :order.filled-condition :order.filled :order.entry-id]]
+                    ["Type Predicates" [:series :array :string :int :float :bool]]
+                    ["Misc" [:multiset :comment :definline]]]]
+    (println (str "Available constructs (" (count all-keys) " total):\n"))
+    (doseq [[cat-label cat-keys] categories]
+      (let [present (sort (filter all-keys cat-keys))]
+        (when (seq present)
+          (println "  " cat-label ":")
+          (doseq [k present]
+            (println (str "    " (name k))))
+          (println))))))
 
 ;; ─── Import ────────────────────────────────────────────────────────
 

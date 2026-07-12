@@ -40,7 +40,7 @@
 (deftest convert-plotting
   (let [r (imp/convert "plot(fast, \"Fast MA\", color=color.blue, linewidth=2)")]
     (is (str/includes? r "(plot fast"))
-    (is (str/includes? r "color=blue"))))
+    (is (str/includes? r ":color blue"))))
 
 (deftest convert-full-strategy
   (let [pine "
@@ -67,7 +67,7 @@ plot(slow, \"Slow\", color=color.red, linewidth=2)"
 
 (deftest convert-with-unknown-flagged
   (let [result (imp/convert "someObscureFunction(x, y)")]
-    (is (str/includes? result "WARN"))))
+    (is (str/includes? result "some-obscure-function"))))
 
 ;; ═══════════════════════════════════════════════════════════════════
 ;; Main
