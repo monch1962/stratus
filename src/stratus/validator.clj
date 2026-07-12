@@ -46,7 +46,8 @@
                    :chart.point.now :chart.point.from-index
                    :input-int :input-float :input-bool :input-string
                    :input-color :input-source :input-symbol :input-timeframe
-                   :input-price :input-session}]
+                   :input-price :input-session
+                   :high :low :open :volume :hl2 :hlc3 :ohlc4}]
     (into simple explicit)))
 
 ;; ─── Arg count hints ──────────────────────────────────────────────

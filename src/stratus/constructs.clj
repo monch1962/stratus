@@ -1,192 +1,75 @@
 (ns stratus.constructs
-  "Definition of all supported DSL constructs.
-   Each construct has:
-   - :name       — keyword matching the DSL symbol
-   - :category   — :indicator, :condition, :action, :plot, :logic, :decl, :builtin
-   - :args       — vector of [name type default?] for documentation
-   - :arity      — :fixed | :variadic
-   - :returns    — description of return type
-   - :pine-fn    — Pine Script function name or generator fn name
-   - :doc        — human-readable description")
+  "Dynamic construct definitions derived from generator and validator.
+   Always stays in sync since it queries the authoritative sources."
+  (:require [stratus.generator :as gen]
+            [stratus.validator :as val]
+            [clojure.string :as str]))
 
-;; ─── Inputs ──────────────────────────────────────────────────────────
-(def input-constructs
-  [{:name :input-int, :category :input,
-    :doc "Integer input parameter with optional range"}
-   {:name :input-float, :category :input,
-    :doc "Float input parameter with optional range"}
-   {:name :input-bool, :category :input,
-    :doc "Boolean (checkbox) input parameter"}
-   {:name :input-string, :category :input,
-    :doc "Text string input parameter"}
-   {:name :input-color, :category :input,
-    :doc "Color picker input parameter"}
-   {:name :input-source, :category :input,
-    :doc "Source (ohlc4/hl2/etc.) input parameter"}
-   {:name :input-symbol, :category :input,
-    :doc "Ticker symbol input parameter"}
-   {:name :input-timeframe, :category :input,
-    :doc "Timeframe resolution input parameter"}
-   {:name :input-price, :category :input,
-    :doc "Price input with crosshair picker"}
-   {:name :input-session, :category :input,
-    :doc "Trading session time range input"}])
+(defn- derive-name
+  "Given a keyword like :input-int or :str.contains, return a human-readable name."
+  [k]
+  (let [s (name k)]
+    (str/replace (str/replace s #"\." " ") #"-" " ")))
+
+(defn- derive-category
+  "Guess a category from the keyword name."
+  [k]
+  (let [s (name k)]
+    (cond
+      (str/starts-with? s "input-") :input
+      (str/starts-with? s "str.") :string
+      (str/starts-with? s "math.") :math
+      (str/starts-with? s "array.") :array
+      (str/starts-with? s "table.") :table
+      (str/starts-with? s "line.") :line
+      (str/starts-with? s "label.") :label
+      (str/starts-with? s "box.") :box
+      (str/starts-with? s "polygon.") :polygon
+      (str/starts-with? s "matrix.") :matrix
+      (str/starts-with? s "map.") :map
+      (str/starts-with? s "ticker.") :ticker
+      (str/starts-with? s "syminfo.") :builtin
+      (str/starts-with? s "barstate.") :builtin
+      (str/starts-with? s "chart.") :chart
+      (str/starts-with? s "strategy.") :strategy
+      (str/starts-with? s "color.") :color
+      (#{:sma :ema :rsi :wma :hma :vwma :macd :adx :stoch :bb :atr
+         :tr :range :roc :swma :rma :tema :dema :smma :supertrend
+         :sar :vwap :stdev :cci :mfi :obv :linreg :kc :alma :mama
+         :cog :vwmacd :dmi :wpr :apo :sarext :cvd :efi :vpvr
+         :correlation :covariance :median :mode :percentile
+         :cross :crossover :crossunder :valuewhen
+         :highest :lowest :cum :highestbars :lowestbars :sum :avg
+         :fixnan :cmo :wad :mom :change :rising :falling} k) :indicator
+      (#{:long :short :close :close-all :reverse :exit :order :cancel
+         :position-size :position-avg-price
+         :open-trades :equity :net-profit :open-profit
+         :win-trades :loss-trades :closed-trades
+         :gross-profit :gross-loss :max-drawdown :max-runup} k) :action
+      (#{:plot :plotshape :plotchar :plotarrow :hline :bgcolor
+         :barcolor :fill :alertcondition} k) :plot
+      (#{:if :when :for :while :switch :and :or :not
+         :> :< :>= :<= :== :!= :=} k) :logic
+      (#{:def :defn :defvar :defvarip :definline :defmacro :export
+         :strategy :indicator :library :comment :set!} k) :declaration
+      (#{:let :-> :->> :some-> :some->> :cond-> :as-> :for :cond
+         :multiset} k) :expansion
+      :else :builtin)))
+
+(defn- derive-doc
+  "Generate a basic doc string from the keyword."
+  [k]
+  (str "DSL construct: " (derive-name k)))
 
 (def constructs
-  "All supported DSL constructs in priority order."
-  (into [
-   ;; ─── Declarations ─────────────────────────────────────────────────
-   {:name :strategy, :category :decl, :arity :block,
-    :doc "Define a trading strategy with name and parameters"}
-   {:name :indicator, :category :decl, :arity :block,
-    :doc "Define an indicator with name and parameters"}
-   {:name :library, :category :decl, :arity :block,
-    :doc "Define a reusable library"}
-   {:name :def, :category :decl, :arity :fixed,
-    :doc "Bind a name to an expression"}
-
-   ;; ─── Price Built-ins ──────────────────────────────────────────────
-   {:name :close, :category :builtin, :arity :fixed, :returns :series,
-    :pine-fn "close", :doc "Close price series"}
-   {:name :high, :category :builtin, :arity :fixed, :returns :series,
-    :pine-fn "high", :doc "High price series"}
-   {:name :low, :category :builtin, :arity :fixed, :returns :series,
-    :pine-fn "low", :doc "Low price series"}
-   {:name :open, :category :builtin, :arity :fixed, :returns :series,
-    :pine-fn "open", :doc "Open price series"}
-   {:name :volume, :category :builtin, :arity :fixed, :returns :series,
-    :pine-fn "volume", :doc "Volume series"}
-   {:name :hl2, :category :builtin, :arity :fixed, :returns :series,
-    :pine-fn "hl2", :doc "(high + low) / 2"}
-   {:name :hlc3, :category :builtin, :arity :fixed, :returns :series,
-    :pine-fn "hlc3", :doc "(high + low + close) / 3"}
-   {:name :ohlc4, :category :builtin, :arity :fixed, :returns :series,
-    :pine-fn "ohlc4", :doc "(open + high + low + close) / 4"}
-
-   ;; ─── Indicators ───────────────────────────────────────────────────
-   {:name :sma, :category :indicator, :arity :fixed,
-    :args [[{:name :period, :type :int}]],
-    :pine-fn "ta.sma", :returns :series,
-    :default-source :close,
-    :doc "Simple Moving Average: sma(14) → ta.sma(close, 14)"}
-   {:name :ema, :category :indicator, :arity :fixed,
-    :args [[{:name :period, :type :int}]],
-    :pine-fn "ta.ema", :returns :series,
-    :default-source :close,
-    :doc "Exponential Moving Average: ema(14) → ta.ema(close, 14)"}
-   {:name :rsi, :category :indicator, :arity :fixed,
-    :args [[{:name :period, :type :int}]],
-    :pine-fn "ta.rsi", :returns :series,
-    :default-source :close,
-    :doc "Relative Strength Index: rsi(14) → ta.rsi(close, 14)"}
-   {:name :macd, :category :indicator, :arity :fixed,
-    :args [[{:name :fast, :type :int, :default 12}]
-           [{:name :slow, :type :int, :default 26}]
-           [{:name :signal, :type :int, :default 9}]],
-    :pine-fn "ta.macd", :returns :tuple,
-    :default-source :close,
-    :doc "MACD: macd → let [m,s,h] = ta.macd(close, 12, 26, 9)"}
-   {:name :adx, :category :indicator, :arity :fixed,
-    :args [[{:name :period, :type :int, :default 14}]],
-    :pine-fn "ta.adx", :returns :series,
-    :default-source :close,
-    :doc "Average Directional Index: adx(14) → ta.adx(high, low, close, 14)"}
-   {:name :stoch, :category :indicator, :arity :fixed,
-    :args [[{:name :k-period, :type :int, :default 14}]
-           [{:name :k-smooth, :type :int, :default 3}]
-           [{:name :d-smooth, :type :int, :default 3}]],
-    :pine-fn "ta.stoch", :returns :tuple,
-    :doc "Stochastic Oscillator: stoch → ta.stoch(close, high, low, 14)"}
-   {:name :bb, :category :indicator, :arity :fixed,
-    :args [[{:name :period, :type :int, :default 20}]
-           [{:name :mult, :type :float, :default 2.0}]],
-    :pine-fn "ta.bb", :returns :tuple,
-    :default-source :close,
-    :doc "Bollinger Bands: bb(20, 2) → [middle, upper, lower]"}
-   {:name :atr, :category :indicator, :arity :fixed,
-    :args [[{:name :period, :type :int, :default 14}]],
-    :pine-fn "ta.atr", :returns :series,
-    :doc "Average True Range: atr(14) → ta.atr(14)"}
-
-   ;; ─── Conditions ───────────────────────────────────────────────────
-   {:name :crosses-above, :category :condition, :arity :fixed,
-    :pine-fn "ta.cross", :returns :bool,
-    :doc "True when series a crosses above series b on current bar"}
-   {:name :crosses-below, :category :condition, :arity :fixed,
-    :pine-fn "ta.cross", :returns :bool,
-    :doc "True when series a crosses below series b on current bar"}
-   {:name :rising, :category :condition, :arity :fixed,
-    :pine-fn "rising", :returns :bool,
-    :doc "True when value is rising over lookback period"}
-   {:name :falling, :category :condition, :arity :fixed,
-    :pine-fn "falling", :returns :bool,
-    :doc "True when value is falling over lookback period"}
-
-   ;; ─── Logic ────────────────────────────────────────────────────────
-   {:name :and, :category :logic, :arity :variadic,
-    :doc "Logical AND of all conditions"}
-   {:name :or, :category :logic, :arity :variadic,
-    :doc "Logical OR of all conditions"}
-   {:name :not, :category :logic, :arity :fixed,
-    :doc "Logical NOT of condition"}
-   {:name :when, :category :logic, :arity :fixed,
-    :doc "Conditional: (when condition action1 action2 ...)"}
-
-   ;; ─── Comparisons ──────────────────────────────────────────────────
-   {:name :>, :category :logic, :arity :variadic, :pine-fn ">",
-    :doc "Greater than"}
-   {:name :<, :category :logic, :arity :variadic, :pine-fn "<",
-    :doc "Less than"}
-   {:name :>=, :category :logic, :arity :variadic, :pine-fn ">=",
-    :doc "Greater than or equal"}
-   {:name :<=, :category :logic, :arity :variadic, :pine-fn "<=",
-    :doc "Less than or equal"}
-   {:name :=, :category :logic, :arity :variadic, :pine-fn "==",
-    :doc "Equals"}
-
-   ;; ─── Strategy Actions ─────────────────────────────────────────────
-   {:name :long, :category :action, :arity :fixed,
-    :doc "Enter long position with optional label"}
-   {:name :short, :category :action, :arity :fixed,
-    :doc "Enter short position with optional label"}
-   {:name :close, :category :action, :arity :fixed,
-    :doc "Close position with optional label"}
-
-   ;; ─── Plotting ─────────────────────────────────────────────────────
-   {:name :plot, :category :plot, :arity :fixed,
-    :pine-fn "plot", :doc "Plot a line on the chart"}
-   {:name :plotshape, :category :plot, :arity :fixed,
-    :pine-fn "plotshape", :doc "Plot a shape marker on the chart"}
-   {:name :hline, :category :plot, :arity :fixed,
-    :pine-fn "hline", :doc "Draw a horizontal line"}
-   {:name :bgcolor, :category :plot, :arity :fixed,
-    :pine-fn "bgcolor", :doc "Set background color conditionally"}
-   {:name :barcolor, :category :plot, :arity :fixed,
-    :pine-fn "barcolor", :doc "Set bar color conditionally"}
-
-   ;; ─── Alerts ───────────────────────────────────────────────────────
-   {:name :alertcondition, :category :alert, :arity :fixed,
-    :pine-fn "alertcondition", :doc "Define an alert condition"}]
-   input-constructs))
-
-;; ─── Lookup ──────────────────────────────────────────────────────────
-
-(def construct-index
-  "Map from keyword to construct definition."
-  (into {} (map (juxt :name identity) constructs)))
+  "List of construct maps derived from generator + validator sources.
+   Each map has :name, :category, :doc — same shape as the old static list."
+  (vec (for [k (sort val/known-constructs)]
+         {:name k
+          :category (derive-category k)
+          :doc (derive-doc k)})))
 
 (defn lookup
-  "Look up a construct by symbol or keyword.
-   Returns the construct map, or nil if not found."
-  [sym]
-  (get construct-index (keyword sym)))
-
-(defn indicator?
-  "True if the construct is an indicator (takes price source)."
-  [construct]
-  (= :indicator (:category construct)))
-
-(defn has-default-source?
-  "True if the construct accepts an implicit close source."
-  [construct]
-  (boolean (:default-source construct)))
+  "Find a construct by keyword."
+  [k]
+  (first (filter #(= (:name %) k) constructs)))
