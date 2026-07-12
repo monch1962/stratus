@@ -21,7 +21,7 @@ brew install borkdude/brew/babashka
 git clone https://github.com/monch1962/stratus
 cd stratus
 make test
-# → 528 tests, 0 failures
+# → 393 tests, 0 failures
 
 # Write a strategy
 cat > crossover.stratus << 'EOF'
@@ -77,12 +77,12 @@ Open TradingView → Pine Editor → **Ctrl+V** → **Ctrl+S** — your indicato
 
 ## Coverage
 
-**528 tests, 1716 assertions, 0 failures** across 27 suites (`make test`).
-**528 tests, 1716 assertions, 0 failures** across all 27 suites.
+**393 tests, 3792 assertions, 0 failures** across 22 suites (`make test`).
+**393 tests, 3792 assertions, 0 failures** across all 22 suites.
 
 ~150 constructs across indicators, conditions, logic, arithmetic, strategy actions,
 plotting, colours, arrays, tables, matrix, map, strings, drawing objects,
-ticker types, chart points, and built-in values.
+security/request, type conversions, inputs, and Clojure expansions.
 
 ### Examples
 
@@ -111,14 +111,17 @@ stratus/
 ├── stratus              CLI wrapper script
 ├── Makefile             make test, make compile
 ├── bb.edn               Babashka project config
-├── src/stratus/
+├── src/stratus/        9 source files
 │   ├── core.clj         CLI entry point
 │   ├── reader.clj       .stratus parser
 │   ├── generator.clj    Pine Script code generator
-│   ├── constructs.clj   DSL construct definitions
-│   ├── importer.clj     Pine Script → Stratus converter
-│   └── simulator.clj    Strategy backtesting engine
-├── test/stratus/        27 test suites, 528 tests, 1716 assertions
+│   ├── inliner.clj      Compile-time inline expansion
+│   ├── expander.clj     Clojure expansion macros
+│   ├── validator.clj    Pre-compile validation
+│   ├── import-guide.clj Pine Script → Stratus conversion guide
+│   ├── simulator.clj    Strategy backtesting engine
+│   └── exporter.clj     OHLCV data export
+├── test/stratus/        22 test suites, 393 tests, 3792 assertions
 ├── examples/            11 example .stratus strategies
 ├── docs/                Split documentation
 └── .vscode/             VS Code syntax highlighting

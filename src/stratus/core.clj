@@ -3,8 +3,8 @@
             [stratus.inliner :as inliner]
             [stratus.expander :as expander]
             [stratus.generator :as gen]
+            [stratus.import-guide :as guide]
             [stratus.validator :as validator]
-            [stratus.importer :as imp]
             [stratus.simulator :as sim]
             [stratus.exporter :as exp]
             [clojure.string :as str])
@@ -146,7 +146,7 @@
   (println "                          [--format <fmt>]      csv or json (default: csv)")
   (println "                          [-o <file>]           Output file")
   (println "                          [--dry-run]           Print to stdout")
-  (println "  import  <file.pine>     [-o <file.stratus>]  Convert Pine to Stratus")
+  (println "  import                           Show conversion guide")
   (println "  simulate <file.stratus> [--bars N] [--data file.csv]  Run simulation")
   (println "  repl                                Interactive DSL evaluator")
   (println "  watch   <file.stratus>  [-o <file.pine>]  Watch for changes")
@@ -315,20 +315,6 @@
             (println (str "    " (name k))))
           (println))))))
 
-;; ─── Import ────────────────────────────────────────────────────────
-
-(defn import-strategy
-  "Convert a Pine Script file to Stratus DSL."
-  [in-path args]
-  (let [args-vec  (vec args)
-        out-idx   (some #(let [i (.indexOf args-vec %)] (when (>= i 0) i)) ["-o" "--output"])
-        out-path  (or (and out-idx (< (inc out-idx) (count args-vec)) (nth args-vec (inc out-idx)))
-                      (str/replace in-path #"\.pine$" ".stratus"))
-        source    (slurp in-path)
-        dsl       (imp/convert source)]
-    (spit out-path dsl)
-    (println "✓ Converted" in-path "→" out-path)))
-
 ;; ─── Simulate ──────────────────────────────────────────────────────
 
 (defn make-sim-bars
@@ -458,10 +444,7 @@
                       (println "✕ File not found:" in-path)))
                   (println "Usage: bb -m stratus.core check <file.stratus>")))
 
-      "import" (let [in-path (first rest-args)]
-                 (if in-path
-                   (import-strategy in-path (vec rest-args))
-                   (println "Usage: bb -m stratus.core import <file.pine> [-o file.stratus]")))
+      "import" (guide/print-guide)
 
       "simulate" (let [in-path (first rest-args)]
                    (if in-path

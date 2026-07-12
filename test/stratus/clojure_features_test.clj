@@ -3,8 +3,7 @@
             [clojure.string :as str]
             [stratus.expander :as expander]
             [stratus.reader :as reader]
-            [stratus.generator :as gen]
-            [stratus.importer :as imp]))
+            [stratus.generator :as gen]))
 
 ;; ═══════════════════════════════════════════════════════════════════
 ;; comment
@@ -309,16 +308,6 @@
 
 (deftest existing-constructs-unaffected
   (is (not (str/includes? (gen/emit-file (reader/parse "(def x 1)")) "WARN"))))
-
-(deftest gann-warns-stable
-  (let [result (imp/convert (slurp "/tmp/gann-swing-repo/GannSwing.pine"))
-        warns (count (re-seq #"WARN" result))]
-    (is (<= warns 2))))
-
-(deftest astro-warns-zero
-  (let [result (imp/convert (slurp "/tmp/gann-swing-repo/AstroEvents.pine"))
-        warns (count (re-seq #"WARN" result))]
-    (is (zero? warns))))
 
 ;; ═══════════════════════════════════════════════════════════════════
 ;; Main
