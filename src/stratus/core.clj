@@ -139,6 +139,7 @@
   (println "Usage:")
   (println "  compile <file.stratus>  [-o <file.pine>]  Compile to Pine Script")
   (println "                          [-c|--clip]       Copy to clipboard")
+  (println "                          [-w|--watch]      Recompile on file save")
   (println "  check   <file.stratus>                    Validate without compiling")
   (println "  export  <symbol>            [--market <m>]     Export OHLCV to CSV")
   (println "                          [--interval <i>]      (default: D)")
@@ -146,7 +147,8 @@
   (println "                          [-o <file>]           Output file")
   (println "                          [--dry-run]           Print to stdout")
   (println "  import  <file.pine>     [-o <file.stratus>]  Convert Pine to Stratus")
-  (println "  simulate <file.stratus> [--bars N]        Simulate strategy")
+  (println "  simulate <file.stratus> [--bars N] [--data file.csv]  Run simulation")
+  (println "  repl                                Interactive DSL evaluator")
   (println "  watch   <file.stratus>  [-o <file.pine>]  Watch for changes")
   (println "                          [-c|--clip]       Auto-copy on save")
   (println "  new     <type> [name]                    Generate scaffold")
@@ -353,13 +355,15 @@
         n-idx     (some #(let [i (.indexOf args-vec %)] (when (>= i 0) i)) ["--bars"])
         n-bars    (if (and n-idx (< (inc n-idx) (count args-vec)))
                     (Integer/parseInt (nth args-vec (inc n-idx))) 300)
+        data-idx  (some #(let [i (.indexOf args-vec %)] (when (>= i 0) i)) ["--data"])
         source    (slurp in-path)
         forms     (reader/parse source)
-        ;; Extract do-like from the parsed forms (skip strategy header)
         body      (filter #(not (and (list? %) (#{:strategy :indicator :library} (first %)))) forms)
         strategy-do (cons 'do body)
         orders    (atom [])
-        bars      (make-sim-bars n-bars)
+        bars      (if (and data-idx (< (inc data-idx) (count args-vec)))
+                    (sim/load-csv (slurp (nth args-vec (inc data-idx))))
+                    (make-sim-bars n-bars))
         result    (sim/simulate bars strategy-do
                     :on-bar (fn [state form]
                               (case (first form)
@@ -412,8 +416,16 @@
     (case cmd
       "compile" (let [in-path (first rest-args)]
                   (if in-path
-                    (compile-strategy in-path (vec rest-args))
-                    (println "Usage: bb -m stratus.core compile <file.stratus> [-o file.pine] [-c]")))
+                    (let [args-vec (vec rest-args)
+                          watch? (or (some #{"-w" "--watch"} args-vec))]
+                      (if watch?
+                        (let [out-idx (some #(let [i (.indexOf args-vec %)] (when (>= i 0) i)) ["-o" "--output"])
+                              out-path (when (and out-idx (< (inc out-idx) (count args-vec))) (nth args-vec (inc out-idx)))
+                              clip? (some #{"-c" "--clip"} args-vec)]
+                          (println "Watching" in-path "(recompile on save)...")
+                          (watch-file in-path out-path clip?))
+                        (compile-strategy in-path args-vec)))
+                    (println "Usage: bb -m stratus.core compile <file.stratus> [-o file.pine] [-c] [-w|--watch]")))
 
       "export" (let [sym (first rest-args)]
                  (if sym
@@ -441,7 +453,7 @@
                   (try
                     (let [source (slurp in-path)
                           forms (reader/parse source)]
-                      (validator/report forms))
+                      (validator/report forms source))
                     (catch java.io.FileNotFoundException e
                       (println "✕ File not found:" in-path)))
                   (println "Usage: bb -m stratus.core check <file.stratus>")))
@@ -454,6 +466,21 @@
       "simulate" (let [in-path (first rest-args)]
                    (if in-path
                      (run-simulation in-path (vec rest-args))
-                     (println "Usage: bb -m stratus.core simulate <file.stratus> [--bars N]")))
+                     (println "Usage: bb -m stratus.core simulate <file.stratus> [--bars N] [--data file.csv]")))
+
+      "repl" (println "Stratus REPL — type (.q) to quit")
+              (loop []
+                (print "stratus> ")
+                (flush)
+                (let [line (read-line)]
+                  (when (and line (not= line "(.q)"))
+                    (try
+                      (let [forms (reader/parse line)
+                            expanded (inliner/expand-all forms)
+                            pine (gen/emit-file expanded)]
+                        (println (str/trim pine)))
+                      (catch Exception e
+                        (println "✕" (.getMessage e))))
+                    (recur))))
 
       (usage))))
