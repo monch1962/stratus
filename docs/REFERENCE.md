@@ -1,6 +1,6 @@
 # Pine Script ↔ Stratus Cross-Reference
 
-Stratus covers **514 tests** across **30 suites** with **~150 constructs** mapped to Pine Script v6.
+Stratus covers **~150 constructs** mapped to Pine Script v6 (22 suites, 393 tests, 0 failures).
 
 ## Declarations
 
