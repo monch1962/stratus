@@ -39,6 +39,33 @@
                 (list step acc)))
             initial steps)))
 
+(defn expand-some-thread-first
+  "Expand (some-> x (f a) (g b)) → nested let/if with na check at each step.
+   (let [g1 x] (if (na g1) na (let [g2 (f g1 a)] (if (na g2) na (g b g2)))))"
+  [form]
+  (let [[_ initial & steps] form]
+    (reduce (fn [acc step]
+              (let [g (gensym "s")]
+                (list 'let [g acc]
+                      (list 'if (list 'na g) 'na
+                            (if (list? step)
+                              (cons (first step) (cons g (rest step)))
+                              (list step g))))))
+            initial steps)))
+
+(defn expand-some-thread-last
+  "Expand (some->> x (f a) (g b)) → nested let/if with na check, thread-last insertion."
+  [form]
+  (let [[_ initial & steps] form]
+    (reduce (fn [acc step]
+              (let [g (gensym "s")]
+                (list 'let [g acc]
+                      (list 'if (list 'na g) 'na
+                            (if (list? step)
+                              (concat step [g])
+                              (list step g))))))
+            initial steps)))
+
 (defn expand-cond
   "Expand (cond (> x 0) :long (< x 0) :short :else :flat)
    → (if (> x 0) :long (if (< x 0) :short :flat))."
@@ -86,6 +113,8 @@
           (= head 'let)   (expand-form (expand-let form))
           (= head '->>)   (expand-thread-last form)
           (= head '->)    (expand-thread-first form)
+          (= head 'some->) (expand-some-thread-first form)
+          (= head 'some->>) (expand-some-thread-last form)
           (= head 'cond)  (expand-cond form)
           :else (map expand-form form)))
       form)))

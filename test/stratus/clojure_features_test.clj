@@ -162,7 +162,50 @@
     (is (some #(str/includes? pine %) ["big" "small"]))))
 
 ;; ═══════════════════════════════════════════════════════════════════
-;; Existing behavior unchanged
+;; some-> (nil-safe thread-first)
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest some-thread-first-basic
+  (let [expanded (expander/expand-form '(some-> (rsi 14) (> 70)))]
+    ;; Should produce (let [g1 (rsi 14)] (if (na g1) na (> g1 70)))
+    (is (= 'let (first expanded)))
+    (is (some #(= 'rsi %) (flatten expanded)))
+    (is (some #(= 'na %) (flatten expanded)))))
+
+(deftest some-thread-first-chain
+  (let [src "(def x (some-> (rsi 14) (> 70) (short \"OB\")))"
+        ast (reader/parse src)
+        expanded (expander/expand-all ast)
+        pine (gen/emit-file expanded)]
+    (is (str/includes? pine "na"))
+    (is (str/includes? pine "rsi"))
+    (is (str/includes? pine "70"))))
+
+(deftest some-thread-first-no-intermediate
+  (let [src "(def x (some-> (rsi 14) (short \"OB\")))"
+        ast (reader/parse src)
+        expanded (expander/expand-all ast)
+        pine (gen/emit-file expanded)]
+    (is (str/includes? pine "if"))
+    (is (str/includes? pine "na"))))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; some->> (nil-safe thread-last)
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest some-thread-last-basic
+  (let [expanded (expander/expand-form '(some->> [1 2 3] (filter even?) (first)))]
+    ;; Should produce nested let/if with thread-last insertion
+    (is (= 'let (first expanded)))
+    (is (some #(= 'filter %) (flatten expanded)))))
+
+(deftest some-thread-last-chain
+  (let [src "(def x (some->> 10 (- 3) (+ 2)))"
+        ast (reader/parse src)
+        expanded (expander/expand-all ast)
+        pine (gen/emit-file expanded)]
+    (is (str/includes? pine "if"))
+    (is (not (str/includes? pine "some->>")))))
 ;; ═══════════════════════════════════════════════════════════════════
 
 (deftest existing-constructs-unaffected
