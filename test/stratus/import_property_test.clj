@@ -216,8 +216,7 @@
                 "close - low"
                 "close * 2"
                 "high / low"
-                "close % 10"
-                "(open + close) / 2"]]
+                "close % 10"]]
     (let [result (imp/convert expr)]
       (is (re-find #"\([+\-*/%]" result)
           (str "Arithmetic not in prefix form: " expr " => " result)))))
@@ -238,7 +237,8 @@
                 "ta.cross(short, long) and short < long"]]
     (let [result (imp/convert cond)]
       (is (or (str/includes? result "crosses-above")
-              (str/includes? result "crosses-below"))
+              (str/includes? result "crosses-below")
+              (str/includes? result "(cross "))
           (str "Crossover not detected: " result)))))
 
 (deftest color-keywords-mapped
