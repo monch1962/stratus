@@ -97,6 +97,44 @@
     (is (str/includes? pine "y = x + 2"))))
 
 ;; ═══════════════════════════════════════════════════════════════════
+;; defmacro — same compile-time substitution as definline
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest defmacro-collects
+  (let [forms '[(defmacro ma-cross [fast slow] (when (crosses-above fast slow) (long "E")))]
+        defs (il/collect-definitions forms)]
+    (is (= #{'ma-cross} (set (keys defs))))))
+
+(deftest defmacro-expands-simple
+  (let [defs {'ma-cross {:params '[fast slow]
+                          :body '[(when (crosses-above fast slow) (long "E"))]}}
+        expanded (il/expand-call '(ma-cross (sma 14) (sma 50)) defs)]
+    (is (= '(when (crosses-above (sma 14) (sma 50)) (long "E")) expanded))))
+
+(deftest defmacro-full-compile
+  (let [source "(defmacro ma-cross [fast slow]
+                  (when (crosses-above fast slow) (long \"E\")))
+                 (def x (sma 50))
+                 (def y (sma 200))
+                 (on-bar
+                   (ma-cross x y))"
+        ast (reader/parse source)
+        inlined (il/expand-all ast)
+        pine (gen/emit-file inlined)]
+    (is (str/includes? pine "ta.cross"))
+    (is (str/includes? pine "strategy.entry"))
+    (is (not (str/includes? pine "defmacro")))
+    (is (not (str/includes? pine "ma-cross")))))
+
+(deftest defmacro-removed-from-output
+  (let [source "(defmacro ignore [x] x)\n(def y (ignore 5))"
+        ast (reader/parse source)
+        inlined (il/expand-all ast)
+        pine (gen/emit-file inlined)]
+    (is (not (str/includes? pine "defmacro")))
+    (is (str/includes? pine "y = 5"))))
+
+;; ═══════════════════════════════════════════════════════════════════
 ;; Main
 ;; ═══════════════════════════════════════════════════════════════════
 

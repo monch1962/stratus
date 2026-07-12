@@ -352,6 +352,10 @@
 ;; P0: comment — returns empty string
 (defmethod expr->pine :comment [form] "")
 
+;; P0: defmacro — should be expanded by inliner
+(defmethod expr->pine :defmacro [form]
+  (str "// defmacro " (name (second form)) " — should have been expanded"))
+
 (defmethod expr->pine :def [form]
   (str (str/replace (name (second form)) #"-" "_") " = " (expr->pine (nth form 2))))
 

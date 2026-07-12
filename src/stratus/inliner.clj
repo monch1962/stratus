@@ -8,8 +8,8 @@
 (declare expand-all)
 
 (defn definline? [form]
-  "True if form is a (definline ...) definition."
-  (and (list? form) (= 'definline (first form))))
+  "True if form is a (definline ...) or (defmacro ...) definition."
+  (and (list? form) (or (= 'definline (first form)) (= 'defmacro (first form)))))
 
 (defn collect-definitions
   "Scan a list of top-level forms and return a map of

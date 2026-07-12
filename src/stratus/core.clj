@@ -214,7 +214,7 @@
                                :time.close :time.tradingday
                                :chart.point.now :chart.point.from-index
                                :polygon.new :polygon.delete]))
-        categories [["Declarations" [:strategy :indicator :library :def :defvar :defvarip :set! :defn :definline :export :comment]]
+        categories [["Declarations" [:strategy :indicator :library :def :defvar :defvarip :set! :defn :definline :defmacro :export :comment]]
                     ["Price Built-ins" [:close :high :low :open :volume :hl2 :hlc3 :ohlc4
                                        :time :time.close :time.tradingday :bar-index
                                        :ticker :timeframe :year :month :dayofweek :dayofmonth
