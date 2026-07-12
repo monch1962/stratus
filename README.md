@@ -48,8 +48,8 @@ EOF
 # Compile and copy to clipboard
 ./stratus compile crossover.stratus --clip
 
-# Or convert existing Pine Script
-./stratus import my-strategy.pine -o my.stratus
+# View the conversion guide
+./stratus import
 
 # Or backtest
 ./stratus simulate crossover.stratus --bars 500
@@ -71,7 +71,7 @@ Open TradingView → Pine Editor → **Ctrl+V** → **Ctrl+S** — your indicato
 |---|---|
 | [`docs/TUTORIAL.md`](docs/TUTORIAL.md) | Step-by-step walkthrough: build a volatility-adaptive RSI from scratch |
 | [`docs/REFERENCE.md`](docs/REFERENCE.md) | Pine Script ↔ Stratus cross-reference: 150+ construct mappings |
-| [`docs/CLI.md`](docs/CLI.md) | Full CLI reference: compile, import, simulate, watch, new, list |
+|| [`docs/CLI.md`](docs/CLI.md) | Full CLI reference: compile, check, simulate, watch, repl, import guide, list |
 | [`docs/TESTING.md`](docs/TESTING.md) | Testing guide: unit tests, property tests, simulator, CI |
 | [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) | TradingView deployment guide: paste, configure, iterate |
 
