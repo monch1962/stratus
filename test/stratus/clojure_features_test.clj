@@ -206,7 +206,43 @@
         pine (gen/emit-file expanded)]
     (is (str/includes? pine "if"))
     (is (not (str/includes? pine "some->>")))))
+
 ;; ═══════════════════════════════════════════════════════════════════
+;; cond-> (conditional thread-first)
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest cond-thread-first-basic
+  (let [expanded (expander/expand-form '(cond-> x (> x 0) (short)))]
+    (is (= 'let (first expanded)))
+    (is (some #(= 'short %) (flatten expanded)))
+    (is (some #(= 'x %) (flatten expanded)))))
+
+(deftest cond-thread-first-chain
+  (let [src "(def result (cond-> (rsi 14) (> x 70) (short \"OB\") (< x 30) (long \"OS\")))"
+        ast (reader/parse src)
+        expanded (expander/expand-all ast)
+        pine (gen/emit-file expanded)]
+    (is (str/includes? pine "short"))
+    (is (str/includes? pine "long"))
+    (is (not (str/includes? pine "cond->")))))
+
+(deftest cond-thread-passthrough
+  (let [expanded (expander/expand-form '(cond-> x false (short)))]
+    ;; When test is false, value passes through unchanged
+    (is (some #(= 'x %) (flatten expanded)))))
+
+;; ═══════════════════════════════════════════════════════════════════
+;; as-> (named threading)
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest as-thread-basic
+  (let [expanded (expander/expand-form '(as-> 5 x (+ x 3)))]
+    (is (= '(+ 5 3) expanded))))
+
+(deftest as-thread-chain
+  (let [expanded (expander/expand-all (reader/parse "(def x (as-> 5 n (+ n 3) (* n 2)))"))]
+    (is (= '(* (+ 5 3) 2) (nth (first expanded) 2)))
+    (is (not-any? #(= 'as-> %) (flatten expanded)))))
 
 (deftest existing-constructs-unaffected
   (is (not (str/includes? (gen/emit-file (reader/parse "(def x 1)")) "WARN"))))

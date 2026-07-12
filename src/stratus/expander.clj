@@ -66,6 +66,46 @@
                               (list step g))))))
             initial steps)))
 
+(defn- subst-symbol
+  "Replace all occurrences of a symbol in a form with a replacement."
+  [form sym replacement]
+  (cond
+    (list? form) (map #(subst-symbol % sym replacement) form)
+    (vector? form) (mapv #(subst-symbol % sym replacement) form)
+    (= form sym) replacement
+    :else form))
+
+(defn expand-cond-thread-first
+  "Expand (cond-> x test1 step1 test2 step2) →
+   nested let/if: each step applies only when its test is truthy,
+   otherwise the accumulated value passes through unchanged."
+  [form]
+  (let [[_ initial & clauses] form]
+    (loop [acc initial, clauses clauses]
+      (if (empty? clauses)
+        acc
+        (let [test (first clauses)
+              step (second clauses)
+              g (gensym "c")]
+          (recur
+            (list 'let [g acc]
+                  (list 'if test
+                        (if (list? step)
+                          (cons (first step) (cons g (rest step)))
+                          (list step g))
+                        g))
+            (drop 2 clauses)))))))
+
+(defn expand-as-thread
+  "Expand (as-> expr name step1 step2 ...) →
+   threads expr through each step, substituting name with the
+   accumulated value at each position."
+  [form]
+  (let [[_ initial name & steps] form]
+    (reduce (fn [acc step]
+              (subst-symbol step name acc))
+            initial steps)))
+
 (defn expand-cond
   "Expand (cond (> x 0) :long (< x 0) :short :else :flat)
    → (if (> x 0) :long (if (< x 0) :short :flat))."
@@ -115,6 +155,8 @@
           (= head '->)    (expand-thread-first form)
           (= head 'some->) (expand-some-thread-first form)
           (= head 'some->>) (expand-some-thread-last form)
+          (= head 'cond->) (expand-cond-thread-first form)
+          (= head 'as->) (expand-as-thread form)
           (= head 'cond)  (expand-cond form)
           :else (map expand-form form)))
       form)))
