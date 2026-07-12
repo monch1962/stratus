@@ -326,6 +326,70 @@ Now switch to TradingView and paste.
 
 ---
 
+## Step 11: Clojure‑inspired features
+
+Stratus supports four additional constructs from Clojure to make your
+indicators more readable and expressive.
+
+### `comment` — block disable
+
+Wrap any form in `(comment ...)` to skip it during compilation. The
+generator emits nothing:
+
+```
+(comment (plot (sma close 14)))  ;; this line is ignored
+```
+
+Use it to temporarily disable code while debugging without deleting it.
+
+### `let` — scoped bindings
+
+Instead of defining top‑level vars for every intermediate value, use
+`let` to bind symbols within a single expression:
+
+```
+;; Stratus                                 → Pine Script
+(def upper (let [base (sma close 20)       → upper = sma(close, 20) * 1.02
+                 band (* base 1.02)]
+              band))
+```
+
+Each binding is substituted directly into the body. Nested `let` forms
+are preserved.
+
+### `->` / `->>` — threading macros
+
+Threading eliminates deeply nested parentheses by passing a value
+through a chain of functions:
+
+```
+;; Instead of this nested form:
+(def z (abs (- close (sma close 14))))
+
+;; Use -> (thread‑first) — inserts each result as the FIRST argument:
+(def z (-> close (minus (sma 14)) (abs)))
+
+;; Use ->> (thread‑last) — inserts each result as the LAST argument:
+(def w (->> 10 (- 3) (+ 2)))    ;; → (+ 2 (- 3 10)) → 2 + (3 - 10) = -5
+```
+
+### `cond` — multi‑branch conditional
+
+`cond` chains multiple conditions without nesting `if` forms:
+
+```
+;; Stratus                                      → Pine Script
+(def signal (cond (> rsi 70) :sell               → signal = if rsi > 70
+                  (< rsi 30) :buy                            sell
+                  :else :neutral)                            else if rsi < 30
+                                                                      buy
+                                                              else
+                                                                  neutral
+)
+```
+
+---
+
 ## Next Steps
 
 | Learn more | Go to |
@@ -333,6 +397,7 @@ Now switch to TradingView and paste.
 | CLI reference | `docs/CLI.md` |
 | Full construct reference | `docs/REFERENCE.md` |
 | Testing strategies | `docs/TESTING.md` |
-| Inline functions (`definline`) | `src/stratus/inliner.clj` |
+|| Inline functions (`definline`) | `src/stratus/inliner.clj` |
+|| Clojure features (`let`, `->`, `cond`, `comment`) | `src/stratus/expander.clj` |
 | Backtesting with simulator | `./stratus simulate` |
 | Converting existing Pine Script | `./stratus import` |

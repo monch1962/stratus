@@ -40,6 +40,7 @@ test:
 	$(BB) -m stratus.import-math-test
 	$(BB) -m stratus.import-refactor-test
 	$(BB) -m stratus.definline-test
+	$(BB) -m stratus.clojure-features-test
 
 compile:
 	@echo "Compiling examples..."

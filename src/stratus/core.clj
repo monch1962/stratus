@@ -1,6 +1,7 @@
 (ns stratus.core
   (:require [stratus.reader :as reader]
             [stratus.inliner :as inliner]
+            [stratus.expander :as expander]
             [stratus.generator :as gen]
             [stratus.constructs :as constructs]
             [stratus.importer :as imp]
@@ -66,6 +67,7 @@
   (try
     (let [source (slurp in-path)
           ast    (reader/parse source)
+          ast    (expander/expand-all ast)
           ast    (inliner/expand-all ast)
           pine   (gen/emit-file ast)]
       pine)

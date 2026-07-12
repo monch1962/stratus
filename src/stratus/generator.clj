@@ -203,6 +203,9 @@
 (defmethod expr->pine :definline [form]
   (str "// definline " (name (second form)) " — should have been expanded"))
 
+;; P0: comment — returns empty string
+(defmethod expr->pine :comment [form] "")
+
 (defmethod expr->pine :def [form]
   (str (str/replace (name (second form)) #"-" "_") " = " (expr->pine (nth form 2))))
 
