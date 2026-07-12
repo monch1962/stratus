@@ -99,6 +99,10 @@ ticker types, chart points, and built-in values.
 | `examples/control-flow.stratus` | if/elseif/else, for loops, persistent state |
 | `examples/color-fills-bg.stratus` | barcolor, bgcolor, color.rgb, from-gradient |
 | `examples/advanced-exit.stratus` | strategy.exit with stops/targets/trailing |
+| `examples/clojure-destructuring.stratus` | let tuple destructuring (macd, bb, stoch) |
+| `examples/clojure-threading.stratus` | ->, ->>, some->, cond->, as-> threading |
+| `examples/clojure-macros.stratus` | defmacro compile-time code templates |
+| `examples/clojure-comprehension.stratus` | for comprehension + multi-arity defn |
 
 ## Project Structure
 

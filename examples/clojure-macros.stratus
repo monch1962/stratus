@@ -1,0 +1,45 @@
+;; Stratus — User-Defined Macros
+;; Demonstrates: defmacro — compile-time code templates
+;; Compile: ./stratus compile examples/clojure-macros.stratus --clip
+;;
+;; Macros let you define reusable pattern templates that expand at
+;; compile time. Unlike functions, macros manipulate the AST directly
+;; and can generate boilerplate.
+
+(strategy "Macro Demo"
+  :default-qty 100
+  :pyramiding 1)
+
+;; Define a macro that generates a moving average crossover pattern
+(defmacro ma-cross [fast slow label]
+  (when (crosses-above fast slow) (long label)))
+
+;; Define a macro that generates an exit on cross-below
+(defmacro ma-exit [fast slow label]
+  (when (crosses-below fast slow) (close label)))
+
+;; Define a macro that generates a two-condition entry
+(defmacro zone-entry [rsi level dir label]
+  (when (and (> rsi level) (< rsi (+ level 10)))
+    (dir label)))
+
+;; Use the macros — they expand to the full forms at compile time
+(def fast-ma (sma 20))
+(def slow-ma (sma 50))
+(def rsi-val (rsi 14))
+
+(on-bar
+  ;; Expands to: (when (crosses-above fast-ma slow-ma) (long "GC"))
+  (ma-cross fast-ma slow-ma "GC")
+
+  ;; Expands to: (when (crosses-below fast-ma slow-ma) (close "GC"))
+  (ma-exit fast-ma slow-ma "GC")
+
+  ;; Expands to: (when (and (> rsi-val 70) (< rsi-val 80)) (short "RSI"))
+  (zone-entry rsi-val 70 short "RSI"))
+
+(plot fast-ma "Fast MA" :color blue :linewidth 2)
+(plot slow-ma "Slow MA" :color red :linewidth 2)
+(plot rsi-val "RSI" :color purple :linewidth 1)
+(hline 70 "Overbought" :color red :linestyle dashed)
+(hline 30 "Oversold" :color green :linestyle dashed)

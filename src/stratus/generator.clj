@@ -807,35 +807,30 @@
     (str "//@version=6\nlibrary(\"" (second form) "\"" (emit-kwargs keyword) ")")))
 
 ;; ─── P2: User-defined functions (defn) ─────────────────────────────
+
+(defn- expand-multi-arity-defn [fname forms]
+  (let [name-str (str/replace (name fname) #"-" "_")
+        p-lists (mapv (fn [a] (vec (map clojure.core/name (first a)))) forms)
+        b-lists (mapv clojure.core/rest forms)
+        all-ps (distinct (apply concat p-lists))
+        param-str (str/join ", " all-ps)
+        n (count p-lists)
+        last-body (first (nth b-lists (dec n)))]
+    (str name-str "(" param-str ") =>\n    "
+         (expr->pine
+           (loop [i (dec n), acc last-body]
+             (if (< i 1) acc
+               (let [extra (drop (count (nth p-lists (dec i))) all-ps)]
+                 (if (seq extra)
+                   (list 'if (list 'na (symbol (first extra)))
+                         (first (nth b-lists (dec i))) :else acc)
+                   acc))))))))
+
 (defmethod expr->pine :defn [form]
-  (let [[_ fname & rest] form]
-    ;; Detect multi-arity: rest starts with a form whose first element is a vector
-    ;; e.g., (defn my-ma ([x] body1) ([x p] body2))
-    (if (and (seq rest) (list? (first rest)) (vector? (ffirst rest)))
-      ;; Multi-arity: merge all param lists, use na? for shorter arities
-      (let [arities (map (fn [arity]
-                           (let [[params & body] arity]
-                             {:params (vec (map clojure.core/name params))
-                              :body body}))
-                         rest)
-            all-params (vec (distinct (mapcat :params arities)))
-            name-str (str/replace (name fname) #"-" "_")
-            param-str (str/join ", " all-params)
-            ;; For each arity, build body with na defaults for missing params
-            defaulted-bodies (map (fn [{:keys [params body]}]
-                                    (let [extra-params (drop (count params) all-params)
-                                          na-checks (map (fn [p] (list 'na (symbol p))) extra-params)]
-                                      (if (seq na-checks)
-                                        (list 'if (first na-checks)
-                                              (first body)
-                                              (first body))
-                                        (first body))))
-                                  arities)]
-        (str name-str "(" param-str ") =>\n    "
-             (str/join "\n    " (map expr->pine defaulted-bodies))))
-      ;; Single arity (original behavior)
-      (let [[_ fname args & body] form
-            name-str (str/replace (name fname) #"-" "_")
+  (let [[_ fname args & body] form]
+    (if (and (seq? args) (vector? (first args)))
+      (expand-multi-arity-defn fname (cons args body))
+      (let [name-str (str/replace (name fname) #"-" "_")
             arg-str (str/join ", " (map clojure.core/name args))]
         (str name-str "(" arg-str ") =>\n    " (str/join "\n    " (map expr->pine body)))))))
 

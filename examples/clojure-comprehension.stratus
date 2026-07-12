@@ -1,0 +1,33 @@
+;; Stratus — For Comprehension & Multi-Arity Functions
+;; Demonstrates: for comprehension (compile-time unroll), multi-arity defn
+;; Compile: ./stratus compile examples/clojure-comprehension.stratus --clip
+;;
+;; The for comprehension unrolls literal collections at compile time.
+;; Multi-arity defn provides optional parameters via na() checks.
+
+(indicator "Comprehension Demo"
+  :overlay true)
+
+;; ─── for comprehension: batch-generate indicator calls ─────────
+;;
+;; (for [len [10 20 50]] (plot (sma len)))
+;; expands at compile time to:
+;; (do (plot (sma 10)) (plot (sma 20)) (plot (sma 50)))
+
+(on-bar
+  (for [len [10 20 50]]
+    (plot (sma len) (tostring len) :linewidth 1)))
+
+;; ─── multi-arity defn: optional parameters via na() guards ─────
+;;
+;; (defn f ([x] body1) ([x y] body2)) generates:
+;;   f(x, y) => na(y) ? body1 : body2
+;; Called with (my-ma close) → y is na → uses default period 14
+;; Called with (my-ma close 20) → y = 20 → uses explicit period
+
+(defn my-ma
+  ([x] (sma x 14))
+  ([x p] (sma x p)))
+
+(plot (my-ma close) "Default MA" :color blue :linewidth 2)
+(plot (my-ma close 10) "Fast MA" :color red :linewidth 1)

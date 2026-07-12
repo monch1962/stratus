@@ -1,0 +1,40 @@
+;; Stratus — Tuple Destructuring with let
+;; Demonstrates: let destructuring for MACD, Bollinger Bands, Stoch
+;; Compile: ./stratus compile examples/clojure-destructuring.stratus --clip
+;;
+;; Pine returns tuples from multi-value indicators. let destructuring
+;; unpacks them into named variables in one step.
+
+(indicator "Tuple Destructuring Demo"
+  :overlay false
+  :precision 4)
+
+;; MACD returns [macdLine, signalLine, histLine]
+;; Destructure in let and use each component
+(defvar macd-hist 0.0)
+
+(let [[macd-line sig-line hist-line] (macd)]
+  (set! macd-hist hist-line))
+
+;; Bollinger Bands return [middle, upper, lower]
+(let [[bb-mid bb-upper bb-lower] (bb 20 2)]
+  (def band-width (- bb-upper bb-lower))
+  (def mid bb-mid))
+
+;; Stochastic returns [k, d]
+(let [[stoch-k stoch-d] (stoch 14 3 3)]
+  (def k-line stoch-k)
+  (def d-line stoch-d))
+
+;; Mixed: simple binding + destructuring in one let
+(let [period 14
+      [rsiLine _ _] (macd :fast 12 :slow 26 :signal 9)]
+  (def computed (rsi period))
+  (def macd-line rsiLine))
+
+(plot macd-hist "MACD Hist" :color navy :linewidth 2)
+(plot band-width "Band Width" :color teal :linewidth 2)
+(plot mid "BB Mid" :color blue :linewidth 1)
+(plot k-line "Stoch %K" :color purple :linewidth 1)
+(plot d-line "Stoch %D" :color orange :linewidth 1)
+(hline 0 "Zero" :color gray :linestyle dotted)

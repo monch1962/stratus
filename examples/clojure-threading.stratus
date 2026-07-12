@@ -1,0 +1,43 @@
+;; Stratus — Clojure Threading Macros
+;; Demonstrates: ->, ->>, some->, cond->, as->
+;; Compile: ./stratus compile examples/clojure-threading.stratus --clip
+;;
+;; Threading macros let you write nested expressions as linear pipelines.
+
+(indicator "Threading Demo"
+  :overlay false
+  :precision 2)
+
+;; -> (thread-first): insert each step's result as the FIRST arg
+;; (-> close (sma 14) (ema 5))
+;; → (ema (sma close 14) 5)
+(def smooth (-> close (sma 14) (ema 5)))
+
+;; ->> (thread-last): insert each step's result as the LAST arg
+;; (->> 14 (sma close) (ema 5))
+;; → (ema 5 (sma close 14))
+(def alt-smooth (->> 14 (sma close) (ema 5)))
+
+;; some-> (nil-safe thread): stops and returns na if any step returns na
+;; Useful when an indicator might not have enough bars to compute
+(def maybe-rsi (some-> (rsi 14) (> 70) (short "OVERBOUGHT")))
+
+;; cond-> (conditional thread): each step only applies when test is true
+;; Here: if rsi > 70 short, else if rsi < 30 long, else pass through
+(defvar position 0)
+(def position (cond-> position
+  (> rsi 14 70) (short "OB")
+  (< rsi 14 30) (long "OS")))
+
+;; as-> (named thread): name the intermediate value
+;; Each step replaces the name with the accumulated value
+(def result (as-> 100 v
+             (* v 2)
+             (+ v 50)
+             (/ v 5)))
+;; → (/ (+ (* 100 2) 50) 5) = 50
+
+(plot smooth "Smoothed" :color blue :linewidth 2)
+(plot alt-smooth "Alt Smooth" :color red :linewidth 1)
+(plot maybe-rsi "RSI Signal" :color purple :linewidth 1)
+(hline 50 "Center" :color gray :linestyle dotted)
