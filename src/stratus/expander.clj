@@ -106,6 +106,35 @@
               (subst-symbol step name acc))
             initial steps)))
 
+(defn expand-for
+  "Expand (for [x [1 2 3]] body) → (do body-with-x=1 body-with-x=2 body-with-x=3)
+   Unrolls the comprehension at compile time, substituting bindings.
+   Pine-style (for [i 1 10] body) and (for [i (range 1 5)] body) are left unchanged."
+  [form]
+  (let [[_ bindings & body] form]
+    ;; Only expand if binding vector has exactly 2 elements (Clojure style)
+    ;; AND the second element is a literal collection, not (range ...)
+    (if (and (vector? bindings) (= 2 (count bindings))
+             (not (and (list? (second bindings))
+                       (= 'range (first (second bindings))))))
+      (let [binding-sym (first bindings)
+            coll-expr (second bindings)
+            coll (if (and (list? coll-expr) (= 'quote (first coll-expr)))
+                   (second coll-expr)
+                   coll-expr)
+            values (if (vector? coll) (vec coll) [coll])]
+        (if (and (sequential? values)
+                 (every? (fn [v] (or (number? v) (keyword? v) (string? v))) values))
+          (let [substituted-bodies (map (fn [val]
+                                          (let [body-form (if (= 1 (count body))
+                                                            (first body)
+                                                            (cons 'do body))]
+                                            (subst-symbol body-form binding-sym val)))
+                                        values)]
+            (cons 'do substituted-bodies))
+          form))
+      form)))
+
 (defn expand-cond
   "Expand (cond (> x 0) :long (< x 0) :short :else :flat)
    → (if (> x 0) :long (if (< x 0) :short :flat))."
@@ -157,6 +186,7 @@
           (= head 'some->>) (expand-some-thread-last form)
           (= head 'cond->) (expand-cond-thread-first form)
           (= head 'as->) (expand-as-thread form)
+          (= head 'for) (expand-for form)
           (= head 'cond)  (expand-cond form)
           :else (map expand-form form)))
       form)))

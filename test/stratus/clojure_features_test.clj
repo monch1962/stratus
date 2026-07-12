@@ -273,6 +273,40 @@
     (is (str/includes? pine "=>"))
     (is (not (str/includes? pine "na(")))))
 
+;; ═══════════════════════════════════════════════════════════════════
+;; for — Clojure-style list comprehension
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest for-comprehension-unrolls-literals
+  (let [expanded (expander/expand-form '(for [len [10 20 50]] (sma len)))]
+    (is (= 'do (first expanded)))
+    (is (= 4 (count expanded)))  ;; (do (sma 10) (sma 20) (sma 50))
+    (is (= '(sma 10) (nth expanded 1)))
+    (is (= '(sma 20) (nth expanded 2)))
+    (is (= '(sma 50) (nth expanded 3)))))
+
+(deftest for-comprehension-multi-body
+  (let [expanded (expander/expand-form '(for [x [1 2]] (def a x) (def b x)))]
+    (is (= 'do (first expanded)))
+    (is (= 3 (count expanded)))))
+
+(deftest for-comprehension-emit
+  (let [src "(for [len [10 20]] (sma len))"
+        ast (reader/parse src)
+        expanded (expander/expand-all ast)
+        pine (gen/emit-file expanded)]
+    (is (str/includes? pine "ta.sma(close, 10)"))
+    (is (str/includes? pine "ta.sma(close, 20)"))))
+
+(deftest for-loop-pine-style-unchanged
+  ;; Pine-style (for [i 1 10] body) inside on-bar should NOT be expanded
+  (let [src "(strategy \"T\" :default-qty 100)\n(defvar sum 0)\n(on-bar\n  (for [i 1 10] (set! sum (+ sum i))))"
+        ast (reader/parse src)
+        expanded (expander/expand-all ast)
+        pine (gen/emit-file expanded)]
+    (is (str/includes? pine "for "))
+    (is (str/includes? pine "= 1 to 10"))))
+
 (deftest existing-constructs-unaffected
   (is (not (str/includes? (gen/emit-file (reader/parse "(def x 1)")) "WARN"))))
 

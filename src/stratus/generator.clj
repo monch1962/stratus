@@ -837,9 +837,17 @@
 
 ;; ─── P2: for loop ──────────────────────────────────────────────────
 (defmethod expr->pine :for [form]
-  (let [[_ [i [_ start end]] & body] form]
-    (str "for " (name i) " = " start " to " end "\n"
-         (str/join "\n" (map #(str "    " (expr->pine %)) body)))))
+  (let [[_ bindings & body] form]
+    (if (and (vector? bindings) (= 3 (count bindings)))
+      ;; (for [i 1 10] body) — literal range in binding vector
+      (let [[i start end] bindings]
+        (str "for " (name i) " = " start " to " end "\n"
+             (str/join "\n" (map #(str "    " (expr->pine %)) body))))
+      ;; (for [i (range 1 10)] body) — range function form
+      (let [[i range-form] bindings
+            [_ start end] range-form]
+        (str "for " (name i) " = " start " to " end "\n"
+             (str/join "\n" (map #(str "    " (expr->pine %)) body)))))))
 
 ;; ─── P2: while loop ────────────────────────────────────────────────
 (defmethod expr->pine :while [form]
