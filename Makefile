@@ -6,7 +6,7 @@ help:
 	@echo "Stratus — LISP-syntax Strategy DSL for Pine Script"
 	@echo ""
 	@echo "Targets:"
-	@echo "  test       Run all tests (522 tests, 1702 assertions)"
+	@echo "  test       Run all tests (528 tests, 1716 assertions)"
 	@echo "  compile    Verify all .stratus examples compile"
 	@echo "  binary     Set up ./stratus CLI wrapper script"
 	@echo "  vscode     Validate VS Code extension JSON files"
@@ -38,6 +38,7 @@ test:
 	$(BB) -m stratus.examples-test
 	$(BB) -m stratus.converter-test
 	$(BB) -m stratus.simulator-test
+	$(BB) -m stratus.simulator-data-test
 	$(BB) -m stratus.validator-test
 	$(BB) -m stratus.generator-property-test
 	$(BB) -m stratus.constructs-test

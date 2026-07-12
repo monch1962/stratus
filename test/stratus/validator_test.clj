@@ -14,11 +14,11 @@
 
 (deftest warns-unknown-construct
   (let [issues (val/validate '[(zark 14)])]
-    (is (str/includes? (first issues) "zark"))))
+    (is (str/includes? (ffirst issues) "zark"))))
 
 (deftest warns-typo-construct
   (let [issues (val/validate '[(smaa 14)])]
-    (is (str/includes? (first issues) "smaa"))))
+    (is (str/includes? (ffirst issues) "smaa"))))
 
 ;; ═══════════════════════════════════════════════════════════════════
 ;; Argument count validation
@@ -26,11 +26,11 @@
 
 (deftest warns-too-few-args
   (let [issues (val/validate '[(sma)])]
-    (is (str/includes? (first issues) "at least 1"))))
+    (is (str/includes? (ffirst issues) "at least 1"))))
 
 (deftest warns-too-many-args
   (let [issues (val/validate '[(sma 14 15 16 17)])]
-    (is (str/includes? (first issues) "at most 3"))))
+    (is (str/includes? (ffirst issues) "at most 3"))))
 
 (deftest valid-arg-count-passes
   (let [issues (val/validate '[(sma 14) (sma close 14) (sma close 14 5)])]
@@ -38,7 +38,7 @@
 
 (deftest pow-requires-two-args
   (let [issues (val/validate '[(pow 2)])]
-    (is (str/includes? (first issues) "at least 2"))))
+    (is (str/includes? (ffirst issues) "at least 2"))))
 
 ;; ═══════════════════════════════════════════════════════════════════
 ;; Range validation — arity checks cover most real issues.
@@ -56,7 +56,7 @@
   (let [forms (reader/parse "(sma 14)\n(zark 99)\n(def x 1)")
         issues (val/validate forms)]
     (is (= 1 (count issues)))
-    (is (str/includes? (first issues) "zark"))))
+    (is (str/includes? (ffirst issues) "zark"))))
 
 (deftest report-function
   (let [forms (reader/parse "(sma 14)")]

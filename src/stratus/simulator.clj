@@ -238,3 +238,25 @@
           (doseq [f on-bar-forms]
             (eval-when state'' f on-bar))
           (recur state'' (rest remaining)))))))
+
+(defn load-csv
+  "Load OHLCV bar data from a CSV string with headers."
+  [csv-str]
+  (let [lines (str/split-lines (str/trim csv-str))
+        header (first lines)
+        data-lines (remove str/blank? (rest lines))
+        cols (mapv str/lower-case (str/split header #","))
+        o-idx (.indexOf cols "open")
+        h-idx (.indexOf cols "high")
+        l-idx (.indexOf cols "low")
+        c-idx (.indexOf cols "close")
+        v-idx (.indexOf cols "volume")]
+    (vec (for [line data-lines]
+      (let [parts (str/split line #",")
+            safe-dbl #(try (Double/parseDouble (str/trim %)) (catch Exception _ 0.0))
+            safe-int #(try (Integer/parseInt (str/trim %)) (catch Exception _ 0))]
+        {:open (safe-dbl (nth parts o-idx "0"))
+         :high (safe-dbl (nth parts h-idx "0"))
+         :low (safe-dbl (nth parts l-idx "0"))
+         :close (safe-dbl (nth parts c-idx "0"))
+         :volume (safe-int (nth parts v-idx "0"))})))))

@@ -134,20 +134,35 @@
     []))
 
 (defn validate
-  "Validate a list of parsed forms. Returns a vector of warning/error strings."
+  "Validate a list of parsed forms. Returns a vector of [warning form] pairs."
   [forms]
-  (vec (mapcat validate-form forms)))
+  (vec (mapcat (fn [f] (map (fn [w] [w f]) (validate-form f))) forms)))
 
 ;; ─── Friendly output ──────────────────────────────────────────────
 
+(defn- find-line [source form]
+  "Find the approximate source line number for a form."
+  (let [lines (str/split-lines source)
+        text-to-find (str/replace-first (pr-str (first form)) #"^\"|\"$" "")]
+    (loop [i 0]
+      (if (< i (count lines))
+        (if (str/includes? (nth lines i) text-to-find)
+          (inc i)
+          (recur (inc i)))
+        1))))
+
 (defn report
   "Run validation and print a friendly report. Returns true if no issues."
-  [forms]
-  (let [issues (validate forms)]
-    (if (empty? issues)
-      (do (println "✓ No issues found")
-          true)
-      (do (println "Validation found" (count issues) "issue(s):")
-          (doseq [i issues]
-            (println "  " i))
-          false))))
+  ([forms] (report forms ""))
+  ([forms source]
+   (let [issues (validate forms)]
+     (if (empty? issues)
+       (do (println "✓ No issues found")
+           true)
+       (do (println "Validation found" (count issues) "issue(s):")
+           (doseq [[warn form] issues]
+             (let [line (when (seq source) (find-line source form))]
+               (print "  ")
+               (when line (print (str "line " line ":")))
+               (println warn)))
+           false)))))
