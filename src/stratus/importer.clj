@@ -11,9 +11,9 @@
    "barstate.isrealtime" "bar-realtime", "barstate.ishistory" "bar-history"})
 
 (def indicator-patterns
-  [[#"ta\.sma\(([^,]+),?\s*([^)]*)\)"          "(sma $1$2)"]
-   [#"ta\.ema\(([^,]+),?\s*([^)]*)\)"          "(ema $1$2)"]
-   [#"ta\.rsi\(([^,]+),?\s*([^)]*)\)"          "(rsi $1$2)"]
+  [[#"ta\.sma\(([^,]+),?\s*([^)]*)\)"          "(sma $1 $2)"]
+   [#"ta\.ema\(([^,]+),?\s*([^)]*)\)"          "(ema $1 $2)"]
+   [#"ta\.rsi\(([^,]+),?\s*([^)]*)\)"          "(rsi $1 $2)"]
    [#"ta\.macd\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^)]+)\)" "(macd :fast $2 :slow $3 :signal $4)"]
    [#"ta\.atr\(([^)]*)\)"                       "(atr $1)"]
    [#"ta\.adx\([^,]+,\s*[^,]+,\s*[^,]+,\s*([^)]+)\)"  "(adx $1)"]
@@ -146,6 +146,9 @@
       (#(str/replace % #"\biff\(([^,]+),\s*([^,]+),\s*([^)]+)\)" "(iff $1 $2 $3)"))
       (#(str/replace % #"\bta\.cross\(([^,]+),\s*([^)]+)\)\s+and\s+\1\s*>\s*\2" "(crosses-above $1 $2)"))
       (#(str/replace % #"\bta\.cross\(([^,]+),\s*([^)]+)\)\s+and\s+\1\s*<\s*\2" "(crosses-below $1 $2)"))
+      ;; Also handle already-converted (cross ...) form from indicator-patterns
+      (#(str/replace % #"\(cross\s+([^\s,]+)\s+([^\s)]+)\)\s+and\s+\1\s*>\s*\2" "(crosses-above $1 $2)"))
+      (#(str/replace % #"\(cross\s+([^\s,]+)\s+([^\s)]+)\)\s+and\s+\1\s*<\s*\2" "(crosses-below $1 $2)"))
       (#(str/replace % #"\brising\(([^,]+),\s*(\d+)\)" "(rising $1)"))
       (#(str/replace % #"\bfalling\(([^,]+),\s*(\d+)\)" "(falling $1)"))
       (#(str/replace % #"\bta\.(\w+)\(" "($1 "))
@@ -242,7 +245,7 @@
   "Vector of [predicate-regex handler-fn] for convert-line dispatch.
    Uses re-pattern with escaped strings for SCI compatibility."
   (let [rp re-pattern]
-    [[(rp "^strategy|indicator|library\\(")       (fn [t line] (or (convert-strategy-header t) (str "; " t)))]
+    [[(rp "^(strategy|indicator|library)\\(")       (fn [t line] (or (convert-strategy-header t) (str "; " t)))]
      [(rp "^input\\.\\w+\\(")                     (fn [t line] (convert-input t))]
      [(rp "^var(ip)?\\s+\\w+\\s+\\w+\\s*=")       (fn [t line]
         (let [[_ ip _type varname expr] (re-find #"^\s*var(ip)?\s+(\w+)\s+(\w+)\s*=\s*(.+)" t)

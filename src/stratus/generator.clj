@@ -183,10 +183,156 @@
         (true? form) "true" (false? form) "false" (nil? form) "na"
         :otherwise (str form)))
 
+
+;; ─── Simple method registry ─────────────────────────────────
+;; Methods listed here follow the pattern:
+;;   pine_fn(arg1, arg2, ...)
+;; and do not need individual defmethods.
+(def pine-simple-map
+  {  ;; array (19)
+     :array.avg "array.avg"
+     :array.clear "array.clear"
+     :array.concat "array.concat"
+     :array.copy "array.copy"
+     :array.includes "array.includes"
+     :array.indexof "array.indexof"
+     :array.insert "array.insert"
+     :array.lastindexof "array.lastindexof"
+     :array.max "array.max"
+     :array.median "array.median"
+     :array.min "array.min"
+     :array.mode "array.mode"
+     :array.range "array.range"
+     :array.remove "array.remove"
+     :array.shift "array.shift"
+     :array.slice "array.slice"
+     :array.stdev "array.stdev"
+     :array.sum "array.sum"
+     :array.unshift "array.unshift"
+     ;; box (6)
+     :box.get-bottom "box.get_bottom"
+     :box.get-left "box.get_left"
+     :box.get-right "box.get_right"
+     :box.get-top "box.get_top"
+     :box.set-extend "box.set_extend"
+     :box.set-style "box.set_style"
+     ;; chart (2)
+     :chart.point.from-index "chart.point.from_index"
+     :chart.point.now "chart.point.now"
+     ;; color (4)
+     :color.b "color.b"
+     :color.g "color.g"
+     :color.r "color.r"
+     :color.t "color.t"
+     ;; label (7)
+     :label.get-text "label.get_text"
+     :label.get-x "label.get_x"
+     :label.get-y "label.get_y"
+     :label.set-size "label.set_size"
+     :label.set-style "label.set_style"
+     :label.set-textalign "label.set_textalign"
+     :label.set-textcolor "label.set_textcolor"
+     ;; line (6)
+     :line.get-price "line.get_price"
+     :line.get-x1 "line.get_x1"
+     :line.get-x2 "line.get_x2"
+     :line.get-y1 "line.get_y1"
+     :line.get-y2 "line.get_y2"
+     :line.set-xloc "line.set_xloc"
+     ;; map (7)
+     :map.contains "map.contains"
+     :map.delete "map.delete"
+     :map.get "map.get"
+     :map.keys "map.keys"
+     :map.put "map.put"
+     :map.size "map.size"
+     :map.values "map.values"
+     ;; math (14)
+     :abs "math.abs"
+     :array "array"
+     :bool "bool"
+     :ceil "math.ceil"
+     :exp "math.exp"
+     :float "float"
+     :floor "math.floor"
+     :int "int"
+     :log "math.log"
+     :log10 "math.log10"
+     :series "series"
+     :sign "math.sign"
+     :sqrt "math.sqrt"
+     :string "string"
+     ;; matrix (15)
+     :matrix.col "matrix.col"
+     :matrix.columns "matrix.columns"
+     :matrix.det "matrix.det"
+     :matrix.fill "matrix.fill"
+     :matrix.get "matrix.get"
+     :matrix.inv "matrix.inv"
+     :matrix.multiply "matrix.multiply"
+     :matrix.pinv "matrix.pinv"
+     :matrix.rank "matrix.rank"
+     :matrix.row "matrix.row"
+     :matrix.rows "matrix.rows"
+     :matrix.set "matrix.set"
+     :matrix.size "matrix.size"
+     :matrix.sum "matrix.sum"
+     :matrix.transpose "matrix.transpose"
+     ;; order (5)
+     :order.entry-condition "order.entry_condition"
+     :order.entry-id "order.entry_id"
+     :order.exit-condition "order.exit_condition"
+     :order.filled "order.filled"
+     :order.filled-condition "order.filled_condition"
+     ;; polygon (7)
+     :polygon.delete "polygon.delete"
+     :polygon.get-bordercolor "polygon.get_bordercolor"
+     :polygon.get-borderwidth "polygon.get_borderwidth"
+     :polygon.get-fillcolor "polygon.get_fillcolor"
+     :polygon.set-bordercolor "polygon.set_bordercolor"
+     :polygon.set-borderwidth "polygon.set_borderwidth"
+     :polygon.set-fillcolor "polygon.set_fillcolor"
+     ;; str (11)
+     :str.contains "str.contains"
+     :str.endswith "str.endswith"
+     :str.length "str.length"
+     :str.lower "str.lower"
+     :str.replace-all "str.replace_all"
+     :str.split "str.split"
+     :str.startswith "str.startswith"
+     :str.substr "str.substr"
+     :str.substring "str.substring"
+     :str.tonumber "str.tonumber"
+     :str.upper "str.upper"
+     ;; table (11)
+     :table.clear "table.clear"
+     :table.delete "table.delete"
+     :table.get-location "table.get_location"
+     :table.get-size "table.get_size"
+     :table.merge-cells "table.merge_cells"
+     :table.set-bgcolor "table.set_bgcolor"
+     :table.set-border-color "table.set_border_color"
+     :table.set-border-width "table.set_border_width"
+     :table.set-color "table.set_color"
+     :table.set-position "table.set_position"
+     :table.set-size "table.set_size"
+     ;; ticker (7)
+     :ticker.heikinashi "ticker.heikinashi"
+     :ticker.kagi "ticker.kagi"
+     :ticker.linebreak "ticker.linebreak"
+     :ticker.new "ticker.new"
+     :ticker.pnf "ticker.pnf"
+     :ticker.range "ticker.range"
+     :ticker.renko "ticker.renko"})
+
 (defmethod expr->pine :default [form]
-  (let [fn-name (name (first form))
+  (let [k (keyword (first form))
+        fn-name (name (first form))
         args (rest form)]
-    (str (str/replace fn-name #"-" "_") "(" (str/join ", " (map expr->pine args)) ")")))
+    (if-let [pine-fn (get pine-simple-map k)]
+      (str pine-fn "(" (str/join ", " (map expr->pine args)) ")")
+      (str (str/replace fn-name #"-" "_")
+           "(" (str/join ", " (map expr->pine args)) ")"))))
 
 ;; ─── Strategy / Indicator / Library Headers ─────────────────────────
 
@@ -505,17 +651,6 @@
                                              (str/split-lines (expr->pine a))))
                                       actions)]
               (recur (drop 2 rem) (into lines (cons (str prefix (expr->pine cond)) action-lines)) (inc idx)))))))))
-  ;; Note: idx tracks "if" vs "else if" prefix only.
-  ;; All branch lines are unindented (relative 0).
-  ;; All body lines get a fixed 4-space indent.
-  ;; Nested ifs inside bodies get their own (expr->pine) call.
-
-;; ─── On-Bar Block (extended with if/else support) ──────────────────
-
-;; ─── P3: Math scalars ──────────────────────────────────────────────
-(doseq [s [:log :log10 :exp :sqrt :abs :ceil :floor :round :sign]]
-  (defmethod expr->pine s [form]
-    (str "math." (name s) "(" (expr->pine (second form)) ")")))
 ;; Math constants (zero-arg)
 (defmethod expr->pine :pi  [form] "math.pi")
 (defmethod expr->pine :tau [form] "math.tau")
@@ -631,46 +766,6 @@
 ;; P3: array.fill / array.reverse
 (defmethod expr->pine :array.fill   [form] (str "array.fill(" (str/join ", " (map expr->pine (rest form))) ")"))
 (defmethod expr->pine :array.reverse [form] (str "array.reverse(" (expr->pine (second form)) ")"))
-
-;; P3: Extended array operations
-(doseq [[sym pine arity] [['array.insert "array.insert" 3] ['array.remove "array.remove" 2]
-                          ['array.clear "array.clear" 1] ['array.concat "array.concat" 2]
-                          ['array.slice "array.slice" 3] ['array.copy "array.copy" 1]
-                          ['array.shift "array.shift" 1] ['array.unshift "array.unshift" 2]
-                          ['array.includes "array.includes" 2] ['array.indexof "array.indexof" 2]
-                          ['array.lastindexof "array.lastindexof" 2]
-                          ['array.min "array.min" 1] ['array.max "array.max" 1]
-                          ['array.avg "array.avg" 1] ['array.median "array.median" 1]
-                          ['array.sum "array.sum" 1] ['array.stdev "array.stdev" 1]
-                          ['array.mode "array.mode" 1] ['array.range "array.range" 1]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
-;; P3: Table operations
-(doseq [[sym pine] [['table.clear "table.clear"] ['table.delete "table.delete"]
-                    ['table.merge-cells "table.merge_cells"]
-                    ['table.set-position "table.set_position"] ['table.set-size "table.set_size"]
-                    ['table.set-color "table.set_color"] ['table.set-bgcolor "table.set_bgcolor"]
-                    ['table.set-border-color "table.set_border_color"]
-                    ['table.set-border-width "table.set_border_width"]
-                    ['table.get-location "table.get_location"] ['table.get-size "table.get_size"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
-;; P4: String functions
-(doseq [[sym pine] [['str.contains "str.contains"] ['str.length "str.length"]
-                    ['str.split "str.split"] ['str.lower "str.lower"] ['str.upper "str.upper"]
-                    ['str.replace-all "str.replace_all"] ['str.substring "str.substring"]
-                    ['str.substr "str.substr"] ['str.startswith "str.startswith"]
-                    ['str.endswith "str.endswith"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
-;; P4: Type conversion / str.tonumber
-(doseq [[sym pine] [['int "int"] ['float "float"] ['str.tonumber "str.tonumber"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
 ;; P4: timestamp
 (defmethod expr->pine :timestamp [form]
   (str "timestamp(" (str/join ", " (map expr->pine (rest form))) ")"))
@@ -681,21 +776,6 @@
     (str "request.financial(syminfo.tickerid, " (str/join ", " args) ")")))
 (defmethod expr->pine :random [form]
   (str "request.random(" (str/join ", " (map expr->pine (rest form))) ")"))
-
-;; P4: order.* functions
-(doseq [[sym pine] [['order.entry-condition "order.entry_condition"]
-                    ['order.exit-condition "order.exit_condition"]
-                    ['order.filled-condition "order.filled_condition"]
-                    ['order.filled "order.filled"] ['order.entry-id "order.entry_id"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
-;; P4: chart.point
-(doseq [[sym pine] [['chart.point.now "chart.point.now"]
-                    ['chart.point.from-index "chart.point.from_index"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
 ;; P4: polygon
 (defmethod expr->pine :polygon.new [form]
   (let [{:keys [positional keyword]} (parse-kwargs (drop 1 form))]
@@ -704,59 +784,12 @@
 ;; P4: Matrix
 (defmethod expr->pine :matrix.new [form]
   (str "matrix.new<float>(" (str/join ", " (map expr->pine (rest form))) ")"))
-(doseq [[sym pine] [['matrix.rows "matrix.rows"] ['matrix.columns "matrix.columns"]
-                    ['matrix.size "matrix.size"] ['matrix.get "matrix.get"]
-                    ['matrix.set "matrix.set"] ['matrix.row "matrix.row"]
-                    ['matrix.col "matrix.col"] ['matrix.sum "matrix.sum"]
-                    ['matrix.transpose "matrix.transpose"]
-                    ['matrix.multiply "matrix.multiply"] ['matrix.inv "matrix.inv"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
 ;; P4: Map
 (defmethod expr->pine :map.new [form] "map.new<color, int>()")
-(doseq [[sym pine] [['map.put "map.put"] ['map.get "map.get"] ['map.delete "map.delete"]
-                    ['map.contains "map.contains"] ['map.keys "map.keys"]
-                    ['map.values "map.values"] ['map.size "map.size"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
-;; P3: Color component extractors
-(doseq [[sym pine] [['color.r "color.r"] ['color.g "color.g"]
-                    ['color.b "color.b"] ['color.t "color.t"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
-;; P3: Matrix extended (fill, det, rank, pinv)
-(doseq [[sym pine] [['matrix.fill "matrix.fill"] ['matrix.det "matrix.det"]
-                    ['matrix.rank "matrix.rank"] ['matrix.pinv "matrix.pinv"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
-;; P3: Drawing object getters
-(doseq [[sym pine] [['line.get-x1 "line.get_x1"] ['line.get-x2 "line.get_x2"]
-                    ['line.get-y1 "line.get_y1"] ['line.get-y2 "line.get_y2"]
-                    ['line.get-price "line.get_price"]
-                    ['label.get-x "label.get_x"] ['label.get-y "label.get_y"]
-                    ['label.get-text "label.get_text"]
-                    ['box.get-left "box.get_left"] ['box.get-top "box.get_top"]
-                    ['box.get-right "box.get_right"] ['box.get-bottom "box.get_bottom"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
 ;; P4: time_close / time_tradingday
 (defmethod expr->pine :time.close [form]
   (str "time_close" (when (number? (second form)) (str "[" (second form) "]"))))
 (defmethod expr->pine :time.tradingday [form] "time_tradingday")
-
-;; P4: ticker functions
-(doseq [[sym pine] [['ticker.heikinashi "ticker.heikinashi"] ['ticker.renko "ticker.renko"]
-                    ['ticker.linebreak "ticker.linebreak"] ['ticker.kagi "ticker.kagi"]
-                    ['ticker.pnf "ticker.pnf"] ['ticker.range "ticker.range"]
-                    ['ticker.new "ticker.new"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
 ;; ─── P5: Table basics ──────────────────────────────────────────────
 (defmethod expr->pine :table.new [form]
   (let [{:keys [keyword]} (parse-kwargs (drop 1 form))]
@@ -819,73 +852,52 @@
 
 ;; ─── Public API ─────────────────────────────────────────────────────
 
-(defn kw-first [coll kw] (= (keyword (first coll)) kw))
-
 (defn emit-file [forms]
-  (let [by-type  (fn [kw] (filter #(kw-first % kw) forms))
-        defs     (by-type :def)
-        defns    (by-type :defn)
-        defvars  (by-type :defvar)
-        defvips  (by-type :defvarip)
-        sets     (by-type :set!)
-        multis   (by-type :multiset)
-        secs     (by-type :security)
-        switches (by-type :switch)
-        inputs   (concat (by-type :input-int) (by-type :input-float) (by-type :input-bool)
-                        (by-type :input-string) (by-type :input-color) (by-type :input-source)
-                        (by-type :input-symbol) (by-type :input-timeframe))
-        exits    (by-type :exit)]
+  (let [groups (group-by #(keyword (first %)) forms)
+        section (fn [kw] (get groups kw))
+        inputs (mapcat section [:input-int :input-float :input-bool :input-string
+                                :input-color :input-source :input-symbol :input-timeframe
+                                :input-price :input-session])
+        exits (section :exit)]
     (str/join "\n"
       (filter some?
         ["//@version=6" ""
-         (when-let [s (first (by-type :strategy))]  (str (expr->pine s) "\n"))
-         (when-let [s (first (by-type :indicator))] (str (expr->pine s) "\n"))
-         (when-let [s (first (by-type :library))] (str (expr->pine s) "\n"))
+         (when-let [s (first (section :strategy))]  (str (expr->pine s) "\n"))
+         (when-let [s (first (section :indicator))] (str (expr->pine s) "\n"))
+         (when-let [s (first (section :library))] (str (expr->pine s) "\n"))
          ;; Input declarations
          (when (seq inputs) (str (str/join "\n" (map expr->pine inputs)) "\n"))
          ;; Variable bindings: defvars, then defs, then defns, then multiset
-         (when (seq defvars) (str (str/join "\n" (map expr->pine defvars)) "\n"))
-         (when (seq defvips) (str (str/join "\n" (map expr->pine defvips)) "\n"))
-         (when (seq defns)   (str (str/join "\n\n" (map expr->pine defns)) "\n"))
-         (when (seq defs)    (str (str/join "\n" (map expr->pine defs)) "\n"))
-         (when (seq multis)  (str (str/join "\n" (map expr->pine multis)) "\n"))
-         (when (seq secs)    (str (str/join "\n" (map expr->pine secs)) "\n"))
+         (when-let [v (seq (section :defvar))]  (str (str/join "\n" (map expr->pine v)) "\n"))
+         (when-let [v (seq (section :defvarip))] (str (str/join "\n" (map expr->pine v)) "\n"))
+         (when-let [v (seq (section :defn))]    (str (str/join "\n\n" (map expr->pine v)) "\n"))
+         (when-let [v (seq (section :def))]     (str (str/join "\n" (map expr->pine v)) "\n"))
+         (when-let [v (seq (section :multiset))] (str (str/join "\n" (map expr->pine v)) "\n"))
+         (when-let [v (seq (section :security))] (str (str/join "\n" (map expr->pine v)) "\n"))
          ;; Switch blocks
-         (when (seq switches) (str (str/join "\n\n" (map expr->pine switches)) "\n"))
+         (when-let [v (seq (section :switch))]  (str (str/join "\n\n" (map expr->pine v)) "\n"))
          ;; Set! assignments (inside on-bar before logic)
-         (when (seq sets)    (str (str/join "\n" (map expr->pine sets)) "\n"))
-         (when-let [exports (seq (by-type :export))]
-         (str (str/join "\n" (map expr->pine exports)) "\n"))
+         (when-let [v (seq (section :set!))]    (str (str/join "\n" (map expr->pine v)) "\n"))
+         (when-let [v (seq (section :export))]  (str (str/join "\n" (map expr->pine v)) "\n"))
          ;; On-bar logic
-         (when-let [o (first (by-type :on-bar))] (str (expr->pine o) "\n"))
+         (when-let [o (first (section :on-bar))] (str (expr->pine o) "\n"))
          ;; Exits
          (when (seq exits)   (str (str/join "\n" (map expr->pine exits)) "\n"))
          ;; Plots
-         (when-let [p (seq (by-type :plot))]           (str (str/join "\n" (map expr->pine p)) "\n"))
-         (str/join "\n" (map expr->pine (by-type :hline)))
-         (str/join "\n" (map expr->pine (by-type :plotshape)))
-         (str/join "\n" (map expr->pine (by-type :fill)))
-         (str/join "\n" (map expr->pine (by-type :bgcolor)))
-         (str/join "\n" (map expr->pine (by-type :barcolor)))
-         (str/join "\n" (map expr->pine (by-type :alertcondition)))
-         (str/join "\n" (map expr->pine (by-type :table.new)))
-         (str/join "\n" (map expr->pine (by-type :table-cell)))
-         (str/join "\n" (map expr->pine (by-type :line.new)))
-         (str/join "\n" (map expr->pine (by-type :label.new)))
-         (str/join "\n" (map expr->pine (by-type :box.new)))
+         (when-let [p (seq (section :plot))] (str (str/join "\n" (map expr->pine p)) "\n"))
+         (str/join "\n" (map expr->pine (section :hline)))
+         (str/join "\n" (map expr->pine (section :plotshape)))
+         (str/join "\n" (map expr->pine (section :fill)))
+         (str/join "\n" (map expr->pine (section :bgcolor)))
+         (str/join "\n" (map expr->pine (section :barcolor)))
+         (str/join "\n" (map expr->pine (section :alertcondition)))
+         (str/join "\n" (map expr->pine (section :table.new)))
+         (str/join "\n" (map expr->pine (section :table-cell)))
+         (str/join "\n" (map expr->pine (section :line.new)))
+         (str/join "\n" (map expr->pine (section :label.new)))
+         (str/join "\n" (map expr->pine (section :box.new)))
          ;; Inline function expansions (do blocks from definline)
-         (str/join "\n" (map expr->pine (by-type :do)))]))))
-
-;; ═══════════════════════════════════════════════════════════════════
-;; Additional generators (appended after main file for compat)
-;; ═══════════════════════════════════════════════════════════════════
-
-;; Type predicates (only non-conflicting names)
-(doseq [[sym pine] [['series "series"] ['array "array"]
-                    ['string "string"] ['int "int"] ['float "float"] ['bool "bool"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
+         (str/join "\n" (map expr->pine (section :do)))]))))
 ;; ta.cmo / ta.wad
 (defmethod expr->pine :cmo [form] (indicator-call form "ta.cmo" "close"))
 (defmethod expr->pine :wad [form]
@@ -920,15 +932,6 @@
   (str "ta.crossover(" (str/join ", " (map expr->pine (rest form))) ")"))
 (defmethod expr->pine :crossunder [form]
   (str "ta.crossunder(" (str/join ", " (map expr->pine (rest form))) ")"))
-
-;; Additional label/line/box property setters
-(doseq [[sym pine] [['label.set-style "label.set_style"] ['label.set-textcolor "label.set_textcolor"]
-                    ['label.set-textalign "label.set_textalign"] ['label.set-size "label.set_size"]
-                    ['line.set-xloc "line.set_xloc"]
-                    ['box.set-extend "box.set_extend"] ['box.set-style "box.set_style"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
 ;; ═══════════════════════════════════════════════════════════════════
 ;; Last missing features — P3 & P4
 ;; ═══════════════════════════════════════════════════════════════════
@@ -938,18 +941,6 @@
 
 ;; request.seed
 (defmethod expr->pine :seed [form] (str "request.seed(" (str/join ", " (map expr->pine (rest form))) ")"))
-
-;; Polygon lifecycle
-(doseq [[sym pine] [['polygon.delete "polygon.delete"]
-                    ['polygon.set-fillcolor "polygon.set_fillcolor"]
-                    ['polygon.set-bordercolor "polygon.set_bordercolor"]
-                    ['polygon.set-borderwidth "polygon.set_borderwidth"]
-                    ['polygon.get-fillcolor "polygon.get_fillcolor"]
-                    ['polygon.get-bordercolor "polygon.get_bordercolor"]
-                    ['polygon.get-borderwidth "polygon.get_borderwidth"]]]
-  (defmethod expr->pine sym [form]
-    (str pine "(" (str/join ", " (map expr->pine (rest form))) ")")))
-
 ;; Matrix type variants (explicit defmethods for SCI compat)
 (defmethod expr->pine :matrix.float  [form] (str "matrix.new<float>("  (str/join ", " (map expr->pine (rest form))) ")"))
 (defmethod expr->pine :matrix.int    [form] (str "matrix.new<int>("    (str/join ", " (map expr->pine (rest form))) ")"))
