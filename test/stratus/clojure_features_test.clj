@@ -54,6 +54,36 @@
     (is (not (str/includes? (gen/emit-file expanded) "ERROR")))))
 
 ;; ═══════════════════════════════════════════════════════════════════
+;; let — sequential destructuring (e.g., tupled indicator returns)
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest let-destructure-vector-basic
+  (let [expanded (expander/expand-form '(let [[m s h] (macd)] (plot m)))]
+    ;; Should produce a do with multiset prepended to body
+    (is (= 'do (first expanded)))
+    (is (= 'multiset (first (second expanded))))))
+
+(deftest let-destructure-emits-multiset
+  (let [src "(let [[m s h] (macd)] (plot m) (plot s) (plot h))"
+        ast (reader/parse src)
+        expanded (expander/expand-all ast)
+        pine (gen/emit-file (reader/parse src))]  ;; raw, not expanded
+    (let [expanded-pine (gen/emit-file expanded)]
+      (is (str/includes? expanded-pine "["))
+      (is (str/includes? expanded-pine "m, s, h"))
+      (is (str/includes? expanded-pine "ta.macd"))
+      (is (str/includes? expanded-pine "plot(m)")))))
+
+(deftest let-destructure-mixed-bindings
+  (let [src "(let [period 14 [m s h] (macd :fast 8 :slow 21)] (plot m) (plot period))"
+        ast (reader/parse src)
+        expanded (expander/expand-all ast)
+        pine (gen/emit-file expanded)]
+    (is (str/includes? pine "["))
+    (is (str/includes? pine "ta.macd"))
+    (is (str/includes? pine "ta.macd"))))  ;; simple binding substituted as usual
+
+;; ═══════════════════════════════════════════════════════════════════
 ;; -> (thread-first)
 ;; ═══════════════════════════════════════════════════════════════════
 

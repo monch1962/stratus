@@ -66,11 +66,20 @@
   (letfn [(expand-let [f]
             (let [[_ bindings & body] f
                   expanded-bindings (mapv expand-form bindings)
-                  subst (apply hash-map expanded-bindings)
-                  substituted (if (= 1 (count body))
-                                (walk-subst (first body) subst)
-                                (cons 'do (map #(walk-subst % subst) body)))]
-              substituted))]
+                  pairs (partition 2 expanded-bindings)
+                  ;; Regular pairs: [sym expr] — symbols get substituted
+                  regular-pairs (remove #(vector? (first %)) pairs)
+                  ;; Destructuring pairs: [[syms] expr] — become multiset
+                  dest-pairs (filter #(vector? (first %)) pairs)
+                  subst (apply hash-map (mapcat identity regular-pairs))
+                  ;; Prepend multiset forms for destructured bindings
+                  preamble (map (fn [[names expr]]
+                                  (list 'multiset (vec names) expr))
+                                dest-pairs)
+                  full-body (concat preamble body)]
+              (if (= 1 (count full-body))
+                (walk-subst (first full-body) subst)
+                (cons 'do (map #(walk-subst % subst) full-body)))))]
     (if (list? form)
       (let [head (first form)]
         (cond
