@@ -77,11 +77,6 @@
     (is (not (str/includes? o "min=1")))
     (is (not (str/includes? o "max=10")))))
 
-(deftest gann-swing-test-minval
-  (require 'stratus.gann-swing-test)
-  (let [r (eval '(clojure.test/run-tests 'stratus.gann-swing-test))]
-    (is (zero? (:fail r)))))
-
 ;; ═══════════════════════════════════════════════════════════════════
 ;; Main
 ;; ═══════════════════════════════════════════════════════════════════

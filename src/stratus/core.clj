@@ -3,6 +3,7 @@
             [stratus.inliner :as inliner]
             [stratus.expander :as expander]
             [stratus.generator :as gen]
+            [stratus.validator :as validator]
             [stratus.importer :as imp]
             [stratus.simulator :as sim]
             [stratus.exporter :as exp]
@@ -138,6 +139,7 @@
   (println "Usage:")
   (println "  compile <file.stratus>  [-o <file.pine>]  Compile to Pine Script")
   (println "                          [-c|--clip]       Copy to clipboard")
+  (println "  check   <file.stratus>                    Validate without compiling")
   (println "  export  <symbol>            [--market <m>]     Export OHLCV to CSV")
   (println "                          [--interval <i>]      (default: D)")
   (println "                          [--format <fmt>]      csv or json (default: csv)")
@@ -433,6 +435,16 @@
                 (println "Usage: bb -m stratus.core new <type> [name]\n  Types: strategy, indicator, library")))
 
       "list" (list-constructs)
+
+      "check" (let [in-path (first rest-args)]
+                (if in-path
+                  (try
+                    (let [source (slurp in-path)
+                          forms (reader/parse source)]
+                      (validator/report forms))
+                    (catch java.io.FileNotFoundException e
+                      (println "✕ File not found:" in-path)))
+                  (println "Usage: bb -m stratus.core check <file.stratus>")))
 
       "import" (let [in-path (first rest-args)]
                  (if in-path

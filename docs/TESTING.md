@@ -17,7 +17,7 @@ this entirely — your strategy DSL is valid Clojure data, so you get the full
 ## Running Tests
 
 ```bash
-# Run all tests (514 across 30 suites)
+# Run all tests (522 across 32 suites)
 make test
 
 # Run individual suites
