@@ -804,10 +804,36 @@
 
 ;; ─── P2: User-defined functions (defn) ─────────────────────────────
 (defmethod expr->pine :defn [form]
-  (let [[_ fname args & body] form
-        name-str (str/replace (name fname) #"-" "_")
-        arg-str (str/join ", " (map clojure.core/name args))]
-    (str name-str "(" arg-str ") =>\n    " (str/join "\n    " (map expr->pine body)))))
+  (let [[_ fname & rest] form]
+    ;; Detect multi-arity: rest starts with a form whose first element is a vector
+    ;; e.g., (defn my-ma ([x] body1) ([x p] body2))
+    (if (and (seq rest) (list? (first rest)) (vector? (ffirst rest)))
+      ;; Multi-arity: merge all param lists, use na? for shorter arities
+      (let [arities (map (fn [arity]
+                           (let [[params & body] arity]
+                             {:params (vec (map clojure.core/name params))
+                              :body body}))
+                         rest)
+            all-params (vec (distinct (mapcat :params arities)))
+            name-str (str/replace (name fname) #"-" "_")
+            param-str (str/join ", " all-params)
+            ;; For each arity, build body with na defaults for missing params
+            defaulted-bodies (map (fn [{:keys [params body]}]
+                                    (let [extra-params (drop (count params) all-params)
+                                          na-checks (map (fn [p] (list 'na (symbol p))) extra-params)]
+                                      (if (seq na-checks)
+                                        (list 'if (first na-checks)
+                                              (first body)
+                                              (first body))
+                                        (first body))))
+                                  arities)]
+        (str name-str "(" param-str ") =>\n    "
+             (str/join "\n    " (map expr->pine defaulted-bodies))))
+      ;; Single arity (original behavior)
+      (let [[_ fname args & body] form
+            name-str (str/replace (name fname) #"-" "_")
+            arg-str (str/join ", " (map clojure.core/name args))]
+        (str name-str "(" arg-str ") =>\n    " (str/join "\n    " (map expr->pine body)))))))
 
 ;; ─── P2: for loop ──────────────────────────────────────────────────
 (defmethod expr->pine :for [form]

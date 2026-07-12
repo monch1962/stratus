@@ -244,6 +244,35 @@
     (is (= '(* (+ 5 3) 2) (nth (first expanded) 2)))
     (is (not-any? #(= 'as-> %) (flatten expanded)))))
 
+;; ═══════════════════════════════════════════════════════════════════
+;; defn — multi-arity (optional parameters via na? check)
+;; ═══════════════════════════════════════════════════════════════════
+
+(deftest defn-multi-arity-two-bodies
+  (let [src "(defn my-ma ([x] (sma x 14)) ([x p] (sma x p)))"
+        ast (reader/parse src)
+        pine (gen/emit-file ast)]
+    ;; Should emit one function with all params + na check
+    (is (str/includes? pine "my_ma(x, p)"))
+    (is (str/includes? pine "=>"))
+    (is (str/includes? pine "na(p)"))))
+
+(deftest defn-multi-arity-default-order
+  (let [src "(defn my-fn ([a] (* a 2)) ([a b] (+ a b)))"
+        ast (reader/parse src)
+        pine (gen/emit-file ast)]
+    (is (str/includes? pine "my_fn(a, b)"))
+    ;; Shorter-arity body should use default for extra params
+    (is (str/includes? pine "na(b)"))))
+
+(deftest defn-single-arity-unchanged
+  (let [src "(defn add [a b] (+ a b))"
+        ast (reader/parse src)
+        pine (gen/emit-file ast)]
+    (is (str/includes? pine "add(a, b)"))
+    (is (str/includes? pine "=>"))
+    (is (not (str/includes? pine "na(")))))
+
 (deftest existing-constructs-unaffected
   (is (not (str/includes? (gen/emit-file (reader/parse "(def x 1)")) "WARN"))))
 
